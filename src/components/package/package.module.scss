@@ -505,7 +505,7 @@
   }
 }
 
-.mobileTabPill {
+.mobileTabs .mobileTabPill {
   position: absolute;
   inset: 0;
   border-radius: 999px;
@@ -606,6 +606,19 @@
   height: 100%;
   border: 0;
   background: #fff;
+
+  // мобильные браузеры часто не рендерят PDF во фрейме — показываем кнопку открытия
+  @include down(md) {
+    display: none;
+  }
+}
+
+.pdfMobile {
+  display: none;
+
+  @include down(md) {
+    display: flex;
+  }
 }
 
 .viewerImageWrap {

@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.idea
+test-results
+playwright-report
+docs
+*.docx
+.env
+.env.local

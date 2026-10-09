@@ -83,6 +83,11 @@ export function DocumentViewer({ document: doc, load }: Props) {
             </>
           )}
           {url && (
+            <a className={s.viewerLink} href={url} target="_blank" rel="noopener" aria-label="Открыть в новой вкладке">
+              <Icon name="eye" size={18} />
+            </a>
+          )}
+          {url && (
             <a className={s.viewerLink} href={url} download={doc.filename} aria-label="Скачать оригинал">
               <Icon name="download" size={18} />
             </a>
@@ -101,7 +106,16 @@ export function DocumentViewer({ document: doc, load }: Props) {
             <Skeleton height="70%" width="80%" radius={12} />
           </div>
         ) : kind === "pdf" ? (
-          <iframe className={s.viewerFrame} src={url} title={`Оригинал: ${doc.filename}`} />
+          <>
+            <iframe className={s.viewerFrame} src={url} title={`Оригинал: ${doc.filename}`} />
+            <div className={`${s.viewerEmpty} ${s.pdfMobile}`}>
+              <Icon name="file" size={28} />
+              <p>PDF откроется во встроенном просмотрщике устройства.</p>
+              <a className={s.viewerDownload} href={url} target="_blank" rel="noopener">
+                <Icon name="eye" size={18} /> Открыть PDF
+              </a>
+            </div>
+          </>
         ) : kind === "image" ? (
           <div className={s.viewerImageWrap}>
             {/* eslint-disable-next-line @next/next/no-img-element -- blob: URL не обрабатывается next/image */}

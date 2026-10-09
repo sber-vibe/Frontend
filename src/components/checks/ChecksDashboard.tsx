@@ -78,7 +78,7 @@ export function ChecksDashboard() {
           <Icon name="search" size={18} />
           <input
             type="search"
-            placeholder="Поиск по организации, ИНН или проекту"
+            placeholder="Организация, ИНН или проект"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             aria-label="Поиск проверок"

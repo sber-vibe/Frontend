@@ -11,3 +11,5 @@ next-env.d.ts
 npm-debug.log*
 .DS_Store
 .idea/
+test-results/
+playwright-report/
