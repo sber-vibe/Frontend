@@ -1,0 +1,404 @@
+@use "tokens" as *;
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ---------- Hero ---------- */
+.hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 20px;
+  border-radius: var(--radius-xl);
+  background: var(--hero-gradient);
+  background-size: 180% 180%;
+  animation: heroShift 16s ease-in-out infinite;
+  color: #fff;
+  box-shadow: 0 16px 40px rgba(16, 127, 44, 0.25);
+
+  @include up(md) {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 36px 40px;
+  }
+
+  // декоративные круги в стиле фирменного градиента
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  &::before {
+    width: 280px;
+    height: 280px;
+    right: -60px;
+    top: -120px;
+    border: 40px solid rgba(255, 255, 255, 0.08);
+    animation: orbit 18s linear infinite;
+  }
+
+  &::after {
+    width: 180px;
+    height: 180px;
+    right: 180px;
+    bottom: -110px;
+    background: radial-gradient(circle, rgba(242, 233, 19, 0.35), transparent 70%);
+  }
+
+  h1 {
+    font-size: clamp(24px, 4vw, 34px);
+    font-weight: 800;
+  }
+}
+
+@keyframes heroShift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.heroText {
+  position: relative;
+  z-index: 1;
+  max-width: 640px;
+}
+
+.heroHello {
+  font-weight: 600;
+  opacity: 0.85;
+  margin-bottom: 6px;
+}
+
+.heroSub {
+  margin-top: 10px;
+  opacity: 0.85;
+}
+
+.heroButton {
+  position: relative;
+  z-index: 1;
+  background: #fff !important;
+  color: var(--green-700) !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+
+  @include down(md) {
+    width: 100%;
+  }
+}
+
+/* ---------- Stats ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+
+  @include up(md) {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+}
+
+.stat {
+  @include card;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px 18px;
+  text-align: left;
+  border: 2px solid transparent;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+
+  &:hover {
+    box-shadow: var(--shadow-md);
+  }
+
+  &[data-active="true"] {
+    border-color: var(--green);
+  }
+
+  &[data-kind="errors"] .statValue {
+    color: var(--danger);
+  }
+  &[data-kind="waiting"] .statValue {
+    color: var(--text-2);
+  }
+  &[data-kind="review"] .statValue {
+    color: var(--green);
+  }
+}
+
+.statValue {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.statLabel {
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+/* ---------- Toolbar ---------- */
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  @include up(lg) {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  max-width: 480px;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  color: var(--text-3);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+
+  &:focus-within {
+    border-color: var(--green);
+    box-shadow: 0 0 0 4px var(--focus);
+  }
+
+  input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    font-size: 16px;
+    color: var(--text);
+  }
+
+  @include down(lg) {
+    max-width: none;
+  }
+}
+
+.chips {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.chip {
+  position: relative;
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-2);
+
+  span {
+    position: relative;
+  }
+
+  &[aria-selected="true"] {
+    color: #fff;
+  }
+}
+
+.chipPill {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--green);
+}
+
+/* ---------- List ---------- */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skeletonCard {
+  @include card;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+}
+
+.card {
+  @include card;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 18px 18px 22px;
+  overflow: hidden;
+  transition:
+    transform 0.25s $ease-out,
+    box-shadow 0.25s $ease-out;
+
+  @include up(md) {
+    flex-direction: row;
+    align-items: center;
+    padding: 20px 24px 20px 28px;
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+
+    .cardArrow {
+      transform: translateX(4px);
+      color: var(--green);
+    }
+  }
+
+  &[data-tone="danger"] .cardAccent {
+    background: var(--danger);
+  }
+  &[data-tone="warning"] .cardAccent {
+    background: var(--warning);
+  }
+  &[data-tone="info"] .cardAccent {
+    background: var(--info);
+  }
+  &[data-tone="success"] .cardAccent {
+    background: var(--green);
+  }
+}
+
+.cardAccent {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: var(--border);
+}
+
+.cardMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardTitleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.cardTitle {
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.cardProject {
+  margin-top: 4px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--text-3);
+}
+
+.metaDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.cardSide {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.docCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.issues {
+  display: inline-flex;
+  gap: 10px;
+}
+
+.issueError,
+.issueWarn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.issueError {
+  color: var(--danger);
+}
+
+.issueWarn {
+  color: var(--warning);
+}
+
+.cardArrow {
+  margin-left: auto;
+  color: var(--text-3);
+  transition:
+    transform 0.25s $ease-out,
+    color 0.2s;
+}

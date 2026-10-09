@@ -1,0 +1,91 @@
+@use "tokens" as *;
+
+.viewport {
+  position: fixed;
+  z-index: 100;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  pointer-events: none;
+
+  @include up(sm) {
+    left: auto;
+    width: 380px;
+  }
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 14px 14px 16px;
+  border-radius: var(--radius);
+  background: #1f2a23;
+  color: #fff;
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  border-left: 4px solid var(--green);
+}
+
+.success {
+  border-left-color: var(--green);
+  .icon {
+    color: #4fd06a;
+  }
+}
+
+.error {
+  border-left-color: var(--danger);
+  .icon {
+    color: #ff6b63;
+  }
+}
+
+.info {
+  border-left-color: var(--info);
+  .icon {
+    color: #4cb8f0;
+  }
+}
+
+.icon {
+  display: flex;
+  padding-top: 1px;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+
+  strong {
+    display: block;
+    font-weight: 600;
+  }
+
+  p {
+    margin-top: 2px;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.72);
+    overflow-wrap: anywhere;
+  }
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+}

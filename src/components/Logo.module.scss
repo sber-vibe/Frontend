@@ -1,0 +1,40 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  font-size: 19px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+
+  b {
+    color: var(--green);
+    font-weight: 800;
+  }
+}
+
+.mark {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  animation: spinIn 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.inverted {
+  color: #fff;
+
+  b {
+    color: #fff;
+  }
+
+  .mark path {
+    stroke: #fff;
+  }
+}
+
+@keyframes spinIn {
+  from {
+    transform: rotate(-120deg) scale(0.6);
+    opacity: 0;
+  }
+}

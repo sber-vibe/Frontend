@@ -1,0 +1,86 @@
+@use "tokens" as *;
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.grid {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+
+  @include up(lg) {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+}
+
+.card {
+  @include card;
+  padding: 24px 20px;
+
+  @include up(md) {
+    padding: 36px 40px;
+  }
+
+  h1 {
+    font-size: clamp(24px, 4vw, 30px);
+  }
+}
+
+.lead {
+  margin: 8px 0 28px;
+  color: var(--text-2);
+}
+
+.steps {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+
+  @include up(lg) {
+    display: flex;
+  }
+}
+
+.step {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+
+  b {
+    display: block;
+  }
+
+  small {
+    color: var(--text-3);
+    font-size: 13px;
+  }
+
+  &[data-active="true"] {
+    border-color: var(--green);
+    box-shadow: 0 0 0 4px var(--green-50);
+
+    .stepNum {
+      background: var(--green);
+      color: #fff;
+    }
+  }
+}
+
+.stepNum {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--neutral-50);
+  color: var(--text-2);
+  font-weight: 800;
+}

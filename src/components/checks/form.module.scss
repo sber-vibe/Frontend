@@ -1,0 +1,46 @@
+@use "tokens" as *;
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.row {
+  display: grid;
+  gap: 20px;
+
+  @include up(md) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  margin-top: 8px;
+
+  @include up(sm) {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+
+  button {
+    @include down(sm) {
+      width: 100%;
+    }
+  }
+}
+
+.serverError {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--danger-50);
+  color: var(--danger);
+  font-weight: 500;
+  overflow: hidden;
+}
