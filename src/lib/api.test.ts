@@ -50,6 +50,11 @@ describe("api client", () => {
     });
   });
 
+  it("переводит отказ по размеру файла (от backend или nginx)", async () => {
+    mockFetch(jsonResponse({ status: 413, detail: "Maximum upload size exceeded" }, 413));
+    await expect(api.uploadDocument("a", new File(["x"], "1.pdf"), "APPLICATION")).rejects.toThrow("Файл больше 10 МБ");
+  });
+
   it("использует текст по HTTP-статусу, если detail пустой", async () => {
     mockFetch(new Response("", { status: 413 }));
     await expect(api.runCheck("x")).rejects.toThrow("Файл слишком большой");

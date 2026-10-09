@@ -36,6 +36,7 @@ const DETAIL_TRANSLATIONS: Record<string, string> = {
   "Allowed extensions: pdf, docx, txt, png, jpg, jpeg": "Допустимые форматы: PDF, DOCX, TXT, PNG, JPG",
   "Unable to read uploaded file": "Не удалось прочитать загруженный файл",
   "Invalid request content.": "Проверьте правильность заполнения полей",
+  "Maximum upload size exceeded": "Файл больше 10 МБ",
 };
 
 export class ApiError extends Error {
