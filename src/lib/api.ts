@@ -49,7 +49,7 @@ export class ApiError extends Error {
   }
 
   get isUnsupported(): boolean {
-    return this.status === 404 || this.status === 405 || this.status === 501;
+    return this.status === 405 || this.status === 501;
   }
 }
 

@@ -62,7 +62,7 @@ describe("api client", () => {
     expect((error as ApiError).status).toBe(0);
   });
 
-  it("помечает 404/405 на PATCH как неподдерживаемую операцию", async () => {
+  it("помечает 405 на PATCH как неподдерживаемую операцию", async () => {
     mockFetch(new Response("", { status: 405 }));
     const error = (await api.updateDocument("a", "d", { type: "APPLICATION" }).catch((e: unknown) => e)) as ApiError;
     expect(error.isUnsupported).toBe(true);

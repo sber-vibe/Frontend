@@ -3,9 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ChecksDashboard } from "./ChecksDashboard";
 import { jsonResponse, makeApplication, makeDocument, makeReport } from "@/test/fixtures";
-import { navigationMock, renderWithProviders } from "@/test/render";
+import { renderWithProviders } from "@/test/render";
 
-vi.mock("next/navigation", () => navigationMock);
+vi.mock("next/navigation", () => import("@/test/navigation"));
 
 const apps = [
   makeApplication({ id: "a1", applicantName: "ООО Ромашка", documents: [makeDocument()], report: makeReport() }),

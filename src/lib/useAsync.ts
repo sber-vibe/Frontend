@@ -8,7 +8,8 @@ interface AsyncState<T> {
   error: string | null;
   loading: boolean;
   reload: () => Promise<void>;
-  setData: (updater: T | ((prev: T | undefined) => T)) => void;
+  /** Локально обновить загруженные данные (no-op, пока данных нет). */
+  mutate: (update: (prev: T) => T) => void;
 }
 
 export function errorMessage(e: unknown): string {
@@ -44,9 +45,9 @@ export function useAsync<T>(load: () => Promise<T>, deps: unknown[]): AsyncState
     void reload();
   }, [reload]);
 
-  const setData = useCallback((updater: T | ((prev: T | undefined) => T)) => {
-    setDataState((prev) => (typeof updater === "function" ? (updater as (p: T | undefined) => T)(prev) : updater));
+  const mutate = useCallback((update: (prev: T) => T) => {
+    setDataState((prev) => (prev === undefined ? prev : update(prev)));
   }, []);
 
-  return { data, error, loading, reload, setData };
+  return { data, error, loading, reload, mutate };
 }
