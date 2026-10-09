@@ -46,6 +46,8 @@ docker build -t subsidy-frontend --build-arg BACKEND_URL=http://backend:8080 .
 docker run --rm -p 3000:3000 subsidy-frontend
 ```
 
+Весь стенд (nginx + frontend + backend) поднимается из репозитория [sber-vibe/infra](https://github.com/sber-vibe/infra).
+
 Next.js проксирует `/api/*` на `BACKEND_URL` (rewrites), поэтому CORS на backend не нужен.
 Адрес фиксируется при сборке.
 

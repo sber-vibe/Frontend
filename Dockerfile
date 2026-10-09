@@ -30,4 +30,6 @@ COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
 USER app
 EXPOSE 3000
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=6 \
+  CMD wget -qO- http://127.0.0.1:3000/login > /dev/null || exit 1
 CMD ["node", "server.js"]
