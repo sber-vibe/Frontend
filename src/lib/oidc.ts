@@ -16,7 +16,46 @@ export function getOidcConfig(): OidcConfig | null {
   return { issuer: issuer.replace(/\/$/, ""), clientId, scope: "openid profile email" };
 }
 
-const PKCE_KEY = "subsidy.oidc.pkce";
+/**
+ * Параметры PKCE хранятся в localStorage по state, а не в sessionStorage вкладки:
+ * ссылка подтверждения почты из письма открывается в новой вкладке, и Keycloak завершает вход уже там.
+ */
+const PKCE_PREFIX = "subsidy.oidc.pkce.";
+/** Сколько ждём возврата из Keycloak: регистрация с подтверждением почты занимает несколько минут. */
+const PKCE_TTL_MS = 30 * 60 * 1000;
+
+interface PendingLogin {
+  verifier: string;
+  returnTo: string;
+  createdAt: number;
+}
+
+function dropExpiredLogins(now = Date.now()) {
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (!key?.startsWith(PKCE_PREFIX)) continue;
+    try {
+      const { createdAt } = JSON.parse(localStorage.getItem(key) ?? "") as PendingLogin;
+      if (!(now - createdAt < PKCE_TTL_MS)) localStorage.removeItem(key);
+    } catch {
+      localStorage.removeItem(key);
+    }
+  }
+}
+
+/** Забирает параметры входа по state — один раз: повторное использование кода невозможно. */
+function takePendingLogin(state: string): PendingLogin | null {
+  dropExpiredLogins();
+  const key = PKCE_PREFIX + state;
+  const raw = localStorage.getItem(key);
+  localStorage.removeItem(key);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as PendingLogin;
+  } catch {
+    return null;
+  }
+}
 
 function base64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -42,7 +81,9 @@ export function redirectUri(): string {
 export async function buildAuthorizeUrl(cfg: OidcConfig, returnTo = "/checks"): Promise<string> {
   const verifier = randomString();
   const state = randomString(16);
-  sessionStorage.setItem(PKCE_KEY, JSON.stringify({ verifier, state, returnTo }));
+  dropExpiredLogins();
+  const pending: PendingLogin = { verifier, returnTo, createdAt: Date.now() };
+  localStorage.setItem(PKCE_PREFIX + state, JSON.stringify(pending));
   const params = new URLSearchParams({
     response_type: "code",
     client_id: cfg.clientId,
@@ -55,6 +96,14 @@ export async function buildAuthorizeUrl(cfg: OidcConfig, returnTo = "/checks"): 
   return `${cfg.issuer}/protocol/openid-connect/auth?${params}`;
 }
 
+/** Вход нельзя завершить этим ответом — нужно начать заново (при активной сессии Keycloak это без пароля). */
+export class LoginExpiredError extends Error {
+  constructor() {
+    super("Сессия входа устарела, попробуйте ещё раз");
+    this.name = "LoginExpiredError";
+  }
+}
+
 export interface TokenSet {
   accessToken: string;
   idToken?: string;
@@ -62,11 +111,10 @@ export interface TokenSet {
 }
 
 export async function exchangeCode(cfg: OidcConfig, code: string, state: string): Promise<{ tokens: TokenSet; returnTo: string }> {
-  const saved = sessionStorage.getItem(PKCE_KEY);
-  sessionStorage.removeItem(PKCE_KEY);
-  if (!saved) throw new Error("Сессия входа устарела, попробуйте ещё раз");
-  const { verifier, state: expected, returnTo } = JSON.parse(saved) as { verifier: string; state: string; returnTo: string };
-  if (state !== expected) throw new Error("Неверный параметр state — вход отклонён");
+  // state не найден: вход начат в другом браузере, просрочен или код уже использован
+  const pending = takePendingLogin(state);
+  if (!pending) throw new LoginExpiredError();
+  const { verifier, returnTo } = pending;
 
   const response = await fetch(`${cfg.issuer}/protocol/openid-connect/token`, {
     method: "POST",
