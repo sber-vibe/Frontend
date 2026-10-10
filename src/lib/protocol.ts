@@ -1,40 +1,50 @@
 import { typeShort, typeTitle } from "./documentTypes";
 import { formatDateTime, formatMoney } from "./format";
-import { completenessRows, findingSeverity, groupFindings, reportStatusView } from "./presentation";
+import { completenessRows, DECISION_VIEW, findingSeverity, groupFindings, reportStatusView } from "./presentation";
 import type { ApplicationView, CheckReport, Finding } from "./types";
 
-const SEVERITY_LABEL = { ERROR: "Ошибка", WARNING: "Предупреждение", INFO: "Информация", OK: "Пройдено" } as const;
+const SEVERITY_LABEL = { ERROR: "Ошибка", WARNING: "Требует внимания", INFO: "Информация", OK: "Пройдено" } as const;
+
+const ROW_MARK = { FOUND: "x", MISSING: " ", CONDITIONAL_MISSING: "?", EXTRA: "+" } as const;
+const ROW_NOTE = { FOUND: "", MISSING: " — не хватает", CONDITIONAL_MISSING: " — условно требуется", EXTRA: " — лишний" } as const;
 
 function findingLine(f: Finding): string {
   const type = f.documentType ? ` [${typeShort(f.documentType)}]` : "";
-  return `- ${SEVERITY_LABEL[findingSeverity(f)]}${type}: ${f.message} (${f.code})`;
+  return `- ${SEVERITY_LABEL[findingSeverity(f)]}${type}: ${f.message}`;
 }
 
-/** Текстовый протокол проверки — дословно по отчёту сервера, для выгрузки и архива. */
+/** Текстовый протокол проверки — дословно по отчёту сервера, для передачи заявителю и архива. */
 export function buildProtocol(app: ApplicationView, report: CheckReport, requiredTypes: string[], specialist?: string): string {
   const status = reportStatusView(report, app.documents.length);
   const groups = groupFindings(report.findings);
   const completeness = completenessRows(requiredTypes, report);
+  const decision = app.decision ? DECISION_VIEW[app.decision.decision] : null;
   const lines = [
     "ПРОТОКОЛ ПРОВЕРКИ ПАКЕТА ДОКУМЕНТОВ НА СУБСИДИЮ",
     "",
     `Организация: ${app.applicantName}`,
     `ИНН: ${app.inn}`,
     `Проект: ${app.projectName}`,
+    app.programName ? `Программа субсидии: ${app.programName}` : null,
     `Запрашиваемая сумма: ${formatMoney(app.requestedAmount)}`,
     `Дата проверки: ${formatDateTime(report.checkedAt)}`,
     specialist ? `Специалист: ${specialist}` : null,
     "",
-    `ИТОГ: ${status.label} (${report.status})`,
-    `Критических ошибок: ${groups.errors.length}`,
-    `Предупреждений: ${groups.warnings.length}`,
+    `ИТОГ АВТОМАТИЧЕСКОЙ ПРОВЕРКИ: ${status.label}`,
+    `Ошибок: ${groups.errors.length}`,
+    `Требуют внимания: ${groups.warnings.length}`,
+    decision && app.decision
+      ? `РЕШЕНИЕ СПЕЦИАЛИСТА: ${decision.label}${app.decision.comment ? ` — ${app.decision.comment}` : ""} (${formatDateTime(app.decision.decidedAt)})`
+      : "РЕШЕНИЕ СПЕЦИАЛИСТА: не принято",
     "",
-    `КОМПЛЕКТНОСТЬ: ${completeness.present} / ${completeness.total}`,
-    ...completeness.rows.map((r) => `  [${r.present ? "x" : " "}] ${typeTitle(r.type)}`),
+    `КОМПЛЕКТНОСТЬ (обязательные): ${completeness.present} / ${completeness.total}`,
+    ...completeness.rows.map(
+      (r) => `  [${ROW_MARK[r.status]}] ${typeTitle(r.type)}${ROW_NOTE[r.status]}${r.condition ? ` (${r.condition})` : ""}`,
+    ),
     "",
     "ДОКУМЕНТЫ ПАКЕТА:",
     ...(app.documents.length
-      ? app.documents.map((d) => `  - ${d.filename}: ${typeTitle(d.type ?? d.detectedType)}`)
+      ? app.documents.map((d) => `  - ${d.filename}: ${typeTitle(d.type ?? d.detectedType)}${d.typeSource === "SPECIALIST" ? " (тип указан специалистом)" : ""}`)
       : ["  (нет документов)"]),
     "",
     "ЗАМЕЧАНИЯ:",

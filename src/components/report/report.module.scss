@@ -161,11 +161,6 @@
   @include card;
   padding: 22px;
 
-  @include up(lg) {
-    position: sticky;
-    top: calc(var(--header-h) + 16px);
-  }
-
   h2 {
     font-size: 18px;
   }
@@ -206,7 +201,7 @@
       color: var(--green);
     }
 
-    &[data-present="false"] {
+    &[data-status="MISSING"] {
       background: var(--danger-50);
       color: var(--danger);
 
@@ -214,7 +209,216 @@
         color: var(--danger);
       }
     }
+
+    &[data-status="CONDITIONAL_MISSING"] {
+      background: var(--warning-50);
+      color: #8a5300;
+
+      svg {
+        color: var(--warning);
+      }
+    }
+
+    &[data-status="EXTRA"] {
+      background: var(--info-50);
+      color: #05608f;
+
+      svg {
+        color: var(--info);
+      }
+    }
   }
+}
+
+.checkText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+
+  small {
+    font-weight: 500;
+    font-size: 12px;
+    opacity: 0.85;
+  }
+}
+
+.uploadLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+
+  svg {
+    color: inherit !important;
+  }
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+
+  @include up(lg) {
+    position: sticky;
+    top: calc(var(--header-h) + 16px);
+  }
+}
+
+.processing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--info-50);
+  color: #05608f;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* ---------- Решение специалиста ---------- */
+.decision {
+  @include card;
+  display: grid;
+  gap: 12px;
+  padding: 22px;
+
+  &[data-tone="success"] {
+    border-color: var(--green-100);
+  }
+
+  &[data-tone="danger"] {
+    border-color: var(--danger-50);
+  }
+
+  h2 {
+    font-size: 18px;
+  }
+}
+
+.decisionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.decisionMeta {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.decisionComment {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-style: italic;
+}
+
+.decisionButtons {
+  display: grid;
+  gap: 8px;
+}
+
+.decisionChoice {
+  --tone: var(--green);
+  --tone-50: var(--green-50);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+
+  svg {
+    color: var(--tone);
+  }
+
+  &[data-tone="warning"] {
+    --tone: var(--warning);
+    --tone-50: var(--warning-50);
+  }
+
+  &[data-tone="danger"] {
+    --tone: var(--danger);
+    --tone-50: var(--danger-50);
+  }
+
+  &:hover:not(:disabled),
+  &[aria-checked="true"] {
+    border-color: var(--tone);
+    background: var(--tone-50);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--focus);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.decisionForm {
+  display: grid;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.decisionLabel {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.decisionTextarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  resize: vertical;
+
+  &:focus {
+    outline: none;
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px var(--focus);
+  }
+}
+
+.decisionActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.decisionError {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+  color: var(--danger);
+  font-weight: 600;
+  font-size: 14px;
 }
 
 .groups {
