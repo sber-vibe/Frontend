@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { typeTitle } from "@/lib/documentTypes";
-import { formatDateTime, formatMoney, pluralize } from "@/lib/format";
+import { formatDateTime, pluralize } from "@/lib/format";
 import {
   completenessRows,
   groupFindings,
@@ -18,6 +18,7 @@ import {
   type Tone,
 } from "@/lib/presentation";
 import { buildProtocol, downloadText } from "@/lib/protocol";
+import { applicationTitle, recognizedInn, requisiteText } from "@/lib/requisites";
 import { errorMessage, useAsync } from "@/lib/useAsync";
 import type { ApplicationView, Finding } from "@/lib/types";
 import { BackLink } from "@/components/BackLink";
@@ -238,7 +239,7 @@ export function ReportView({ id }: { id: string }) {
           <h1>{status.label}</h1>
           <p>{status.description}</p>
           <p className={s.heroMeta}>
-            {app.applicantName} · ИНН {app.inn} · {formatMoney(app.requestedAmount)}
+            {applicationTitle(app)} · ИНН {requisiteText(app, "inn")} · {requisiteText(app, "requested_amount")}
             {app.programName ? ` · ${app.programName}` : ""} · {formatDateTime(report.checkedAt)}
           </p>
         </div>
@@ -270,7 +271,7 @@ export function ReportView({ id }: { id: string }) {
           icon="download"
           onClick={() => {
             const date = report.checkedAt.slice(0, 10);
-            downloadText(`protocol_${app.inn}_${date}.txt`, buildProtocol(app, report, requiredTypes, session?.name));
+            downloadText(`protocol_${recognizedInn(app) ?? app.id.slice(0, 8)}_${date}.txt`, buildProtocol(app, report, requiredTypes, session?.name));
           }}
         >
           Скачать протокол

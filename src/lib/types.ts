@@ -27,13 +27,29 @@ export type CheckOutcome = "PASSED" | "ATTENTION" | "ERRORS";
 /** Кто установил тип документа: модель или специалист вручную. */
 export type TypeSource = "MODEL" | "SPECIALIST";
 
+/** RECOGNIZED — значение прочитано из документа, NOT_RECOGNIZED — прочитать не удалось, нужна проверка специалиста. */
+export type FieldStatus = "RECOGNIZED" | "NOT_RECOGNIZED";
+
 export interface ExtractedField {
   name: string;
+  /** Текущее значение: извлечённое или исправленное специалистом. null — не распознано. */
   value: string | number | null;
+  /** Без status поле считается распознанным, если value не пустое. */
+  status?: FieldStatus;
   confidence?: number | null;
   manuallyCorrected?: boolean;
   /** Где в документе найдено значение — фрагмент текста или номер страницы. */
   source?: string | null;
+  /** Значение, которое извлекла модель, до ручной правки (null — не распознано). */
+  originalValue?: string | number | null;
+  correctedBy?: string | null;
+  correctedAt?: string | null;
+}
+
+/** Реквизит карточки заявки, извлечённый из документа пакета. */
+export interface ApplicationRequisite extends ExtractedField {
+  /** Документ, из которого взято значение, — чтобы показать оригинал рядом. */
+  documentId?: string | null;
 }
 
 export interface DocumentView {
@@ -104,12 +120,16 @@ export interface Decision {
   decidedAt: string;
 }
 
+/**
+ * Организацию, ИНН, проект и сумму специалист не вводит: сервер извлекает их из документов пакета.
+ * До извлечения (или если не распознано) поля равны null.
+ */
 export interface ApplicationView {
   id: string;
-  applicantName: string;
-  inn: string;
-  projectName: string;
-  requestedAmount: number;
+  applicantName: string | null;
+  inn: string | null;
+  projectName: string | null;
+  requestedAmount: number | null;
   createdAt: string;
   documents: DocumentView[];
   report: CheckReport | null;
@@ -121,15 +141,17 @@ export interface ApplicationView {
   /** Пакет с теми же файлами уже проверялся — id той заявки. */
   duplicateOf?: string | null;
   createdBy?: string | null;
+  /**
+   * Реквизиты карточки с источником: company_name, inn, kpp, project_name, requested_amount.
+   * Значения верхнего уровня (applicantName, inn, …) — те же, но без источника и статуса.
+   */
+  requisites?: ApplicationRequisite[];
 }
 
+/** Заявка создаётся пустой: реквизиты сервер извлечёт из загруженного пакета. */
 export interface CreateApplication {
-  applicantName: string;
-  inn: string;
-  projectName: string;
-  requestedAmount: number;
   /** null — программу определит сервер из заявления. */
-  programCode?: string | null;
+  programCode: string | null;
 }
 
 export interface DocumentPatch {

@@ -14,6 +14,7 @@ import {
   processingStatus,
   SEVERITY_TONE,
 } from "@/lib/presentation";
+import { extractionSummary, isRecognized, NOT_RECOGNIZED } from "@/lib/requisites";
 import type { DocumentTypeCode, DocumentView, ExtractedField, Finding, Severity } from "@/lib/types";
 import { Badge, Button, Icon, SelectField, type IconName } from "@/components/ui";
 import { ProcessingSteps } from "./DocumentList";
@@ -51,12 +52,30 @@ function ConfidenceMeter({ value }: { value: number }) {
   );
 }
 
+/** Исходное значение модели и автор правки — история исправления реквизита. */
+export function FieldHistory({ field }: { field: ExtractedField }) {
+  const original =
+    field.originalValue === undefined
+      ? null
+      : field.originalValue === null || field.originalValue === ""
+        ? "не распознано"
+        : formatFieldValue(field.name, field.originalValue);
+  return (
+    <span className={s.fieldHistory}>
+      <Icon name="edit" size={12} /> Исправлено{field.correctedBy ? ` специалистом ${field.correctedBy}` : ""}
+      {field.correctedAt ? `, ${formatDateTime(field.correctedAt)}` : ""}
+      {original !== null && ` · распознано моделью: ${original}`}
+    </span>
+  );
+}
+
 function FieldRow({ field, onSave }: { field: ExtractedField; onSave: (value: string) => Promise<void> }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(String(field.value ?? ""));
   const [saving, setSaving] = useState(false);
 
   useEffect(() => setValue(String(field.value ?? "")), [field.value]);
+  const empty = value.trim() === "";
 
   const save = async () => {
     setSaving(true);
@@ -69,6 +88,7 @@ function FieldRow({ field, onSave }: { field: ExtractedField; onSave: (value: st
   };
 
   const label = fieldLabel(field.name);
+  const recognized = isRecognized(field);
   return (
     <li className={s.fieldRow}>
       <span className={s.fieldName}>
@@ -94,7 +114,7 @@ function FieldRow({ field, onSave }: { field: ExtractedField; onSave: (value: st
             aria-label={`Значение поля «${label}»`}
             autoFocus
           />
-          <Button type="submit" size="sm" iconOnly icon="check" loading={saving} aria-label="Сохранить поле" />
+          <Button type="submit" size="sm" iconOnly icon="check" loading={saving} disabled={empty} aria-label="Сохранить поле" />
           <Button
             size="sm"
             variant="ghost"
@@ -110,20 +130,42 @@ function FieldRow({ field, onSave }: { field: ExtractedField; onSave: (value: st
       ) : (
         <span className={s.fieldValueRow}>
           <span className={s.fieldValue}>
-            {formatFieldValue(field.name, field.value)}
+            {recognized ? formatFieldValue(field.name, field.value) : <Badge tone="warning">{NOT_RECOGNIZED}</Badge>}
             {field.source && <span className={s.fieldSource}>«{field.source}»</span>}
+            {field.manuallyCorrected && <FieldHistory field={field} />}
           </span>
-          {typeof field.confidence === "number" && (
+          {recognized && typeof field.confidence === "number" && (
             <span className={s.fieldConf} data-tone={confidenceTone(field.confidence)}>
               {formatPercent(field.confidence)}
             </span>
           )}
-          <button type="button" className={s.fieldEditBtn} onClick={() => setEditing(true)} aria-label={`Исправить поле «${label}»`}>
+          <button
+            type="button"
+            className={s.fieldEditBtn}
+            onClick={() => {
+              setValue(recognized ? String(field.value) : "");
+              setEditing(true);
+            }}
+            aria-label={`Исправить поле «${label}»`}
+          >
             <Icon name="edit" size={16} />
           </button>
         </span>
       )}
     </li>
+  );
+}
+
+function ExtractionSummary({ fields }: { fields: ExtractedField[] }) {
+  const { recognized, total } = extractionSummary(fields);
+  if (recognized === total) return <p className={s.muted}>Распознаны все поля: {total}</p>;
+  return (
+    <div className={s.confirmBanner} role="status">
+      <Icon name="alert" size={18} />
+      <span>
+        Распознано {recognized} из {total}. Остальные требуют проверки по оригиналу.
+      </span>
+    </div>
   );
 }
 
@@ -265,6 +307,7 @@ export function DocumentDetails({ document: doc, types, findings, onChangeType, 
 
       <div className={s.detailsBlock}>
         <span className={s.detailsLabel}>Извлечённые поля</span>
+        {doc.fields && doc.fields.length > 0 && <ExtractionSummary fields={doc.fields} />}
         {doc.fields && doc.fields.length > 0 ? (
           <ul className={s.fields}>
             {doc.fields.map((f) => (

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { formatMoney, formatRelativeDay, pluralize } from "@/lib/format";
+import { formatRelativeDay, pluralize } from "@/lib/format";
 import { DECISION_VIEW, groupFindings, isProcessing, reportStatusView } from "@/lib/presentation";
+import { applicationTitle, requisiteView } from "@/lib/requisites";
 import type { ApplicationView } from "@/lib/types";
 import { Badge, Icon } from "@/components/ui";
 import s from "./checks.module.scss";
@@ -13,26 +14,31 @@ export function CheckCard({ app }: { app: ApplicationView }) {
   const docs = app.documents.length;
   const processing = app.documents.filter(isProcessing).length;
   const decision = app.decision ? DECISION_VIEW[app.decision.decision] : null;
+  const inn = requisiteView(app, "inn");
+  const amount = requisiteView(app, "requested_amount");
+  const project = requisiteView(app, "project_name");
 
   return (
     <Link href={`/checks/${app.id}`} className={s.card} data-tone={status.tone}>
       <span className={s.cardAccent} aria-hidden="true" />
       <div className={s.cardMain}>
         <div className={s.cardTitleRow}>
-          <h3 className={s.cardTitle}>{app.applicantName}</h3>
+          <h3 className={s.cardTitle}>{applicationTitle(app)}</h3>
           <Badge tone={status.tone}>{status.label}</Badge>
           {decision && <Badge tone={decision.tone}>{decision.label}</Badge>}
         </div>
-        <p className={s.cardProject}>{app.projectName}</p>
+        {project.kind === "value" && <p className={s.cardProject}>{project.text}</p>}
         {app.programName && (
           <span className={s.cardProgram}>
             <Icon name="folder" size={14} /> {app.programName}
           </span>
         )}
         <div className={s.cardMeta}>
-          <span>ИНН {app.inn}</span>
+          <span data-missing={inn.kind === "missing" || undefined}>ИНН {inn.kind === "value" ? inn.text : inn.kind === "missing" ? "не распознан" : "—"}</span>
           <span className={s.metaDot} />
-          <span>{formatMoney(app.requestedAmount)}</span>
+          <span data-missing={amount.kind === "missing" || undefined}>
+            {amount.kind === "value" ? amount.text : amount.kind === "missing" ? "Сумма не распознана" : "Сумма —"}
+          </span>
           <span className={s.metaDot} />
           <span>{formatRelativeDay(app.createdAt)}</span>
         </div>

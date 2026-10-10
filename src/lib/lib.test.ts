@@ -7,7 +7,8 @@ import {
   formatRelativeDay,
   pluralize,
 } from "./format";
-import { parseAmount, toCreateApplication, validateCreateCheck, validateFile } from "./validation";
+import { parseAmount, validateFile } from "./validation";
+import { applicationTitle, extractionSummary, isRecognized, NOT_RECOGNIZED, requisiteText, requisiteView, requisiteViews } from "./requisites";
 import { fieldLabel, selectableTypes, typeShort, typeTitle } from "./documentTypes";
 import {
   completenessRows,
@@ -55,36 +56,6 @@ describe("format", () => {
 });
 
 describe("validation", () => {
-  const valid = { applicantName: "ООО Ромашка", inn: "6161234567", projectName: "Проект", requestedAmount: "850 000", programCode: "" };
-
-  it("пропускает корректные данные", () => {
-    expect(validateCreateCheck(valid)).toEqual({});
-    expect(toCreateApplication({ ...valid, applicantName: "  ООО  " })).toEqual({
-      applicantName: "ООО",
-      inn: "6161234567",
-      projectName: "Проект",
-      requestedAmount: 850000,
-      programCode: null,
-    });
-    expect(toCreateApplication({ ...valid, programCode: "INNOVATION" }).programCode).toBe("INNOVATION");
-  });
-
-  it("проверяет ИНН: только цифры, 10 или 12 знаков", () => {
-    expect(validateCreateCheck({ ...valid, inn: "" }).inn).toBe("Укажите ИНН");
-    expect(validateCreateCheck({ ...valid, inn: "61612a4567" }).inn).toMatch(/только из цифр/);
-    expect(validateCreateCheck({ ...valid, inn: "12345" }).inn).toMatch(/10/);
-    expect(validateCreateCheck({ ...valid, inn: "123456789012" }).inn).toBeUndefined();
-  });
-
-  it("проверяет сумму и обязательные поля", () => {
-    const errors = validateCreateCheck({ applicantName: " ", inn: "6161234567", projectName: "", requestedAmount: "0", programCode: "" });
-    expect(errors.applicantName).toBeDefined();
-    expect(errors.projectName).toBeDefined();
-    expect(errors.requestedAmount).toBe("Сумма должна быть больше нуля");
-    expect(validateCreateCheck({ ...valid, requestedAmount: "abc" }).requestedAmount).toMatch(/число/);
-    expect(validateCreateCheck({ ...valid, applicantName: "x".repeat(201) }).applicantName).toMatch(/200/);
-  });
-
   it("разбирает сумму с пробелами, запятой и знаком рубля", () => {
     expect(parseAmount("1 250 000,50 ₽")).toBe(1250000.5);
     expect(parseAmount("12.345")).toBeNaN();
@@ -190,5 +161,61 @@ describe("presentation", () => {
     expect(result.present).toBe(2);
     expect(result.total).toBe(3);
     expect(result.missing).toEqual(["COST_ESTIMATE"]);
+  });
+});
+
+describe("requisites", () => {
+  const empty = { applicantName: null, inn: null, projectName: null, requestedAmount: null };
+
+  it("пока пакет не загружен или разбирается — значение ещё не извлечено, а не «не распознано»", () => {
+    const fresh = makeApplication(empty);
+    expect(requisiteView(fresh, "inn").kind).toBe("pending");
+    expect(requisiteText(fresh, "inn")).toBe("Появится после загрузки пакета");
+    expect(applicationTitle(fresh)).toBe("Новая заявка");
+
+    const processing = makeApplication({ ...empty, documents: [makeDocument({ processingStatus: "EXTRACTING" })] });
+    expect(requisiteText(processing, "requested_amount")).toBe("Извлекается из документов…");
+  });
+
+  it("после разбора пустое значение — «Не распознано / требуется проверка»", () => {
+    const done = makeApplication({ ...empty, documents: [makeDocument({ processingStatus: "DONE" })] });
+    expect(requisiteView(done, "inn").kind).toBe("missing");
+    expect(requisiteText(done, "inn")).toBe(NOT_RECOGNIZED);
+    expect(applicationTitle(done)).toBe("Организация не распознана");
+  });
+
+  it("явный NOT_RECOGNIZED с сервера не считается извлечённым, даже со значением", () => {
+    const app = makeApplication({
+      requisites: [{ name: "inn", value: "123", status: "NOT_RECOGNIZED", documentId: "d1" }],
+    });
+    expect(requisiteView(app, "inn").kind).toBe("missing");
+    expect(isRecognized({ value: "", status: undefined })).toBe(false);
+    expect(isRecognized({ value: 0, status: "RECOGNIZED" })).toBe(true);
+  });
+
+  it("берёт значение и источник из requisites, форматирует сумму и добавляет дополнительные реквизиты", () => {
+    const app = makeApplication({
+      ...empty,
+      documents: [makeDocument({ id: "d1", processingStatus: "DONE" })],
+      requisites: [
+        { name: "requested_amount", value: 850000, documentId: "d1", source: "Сумма: 850 000 руб." },
+        { name: "kpp", value: "616101001", documentId: "d1" },
+      ],
+    });
+    const amount = requisiteView(app, "requested_amount");
+    expect(amount.kind).toBe("value");
+    expect(amount.text).toBe("850 000 ₽");
+    expect(amount.field?.documentId).toBe("d1");
+    expect(requisiteViews(app).map((v) => v.name)).toEqual(["company_name", "inn", "project_name", "requested_amount", "kpp"]);
+  });
+
+  it("считает распознанными только непустые поля без NOT_RECOGNIZED", () => {
+    expect(
+      extractionSummary([
+        { name: "inn", value: "6161234567" },
+        { name: "kpp", value: null },
+        { name: "date", value: "2026-10-01", status: "NOT_RECOGNIZED" },
+      ]),
+    ).toEqual({ recognized: 1, total: 3 });
   });
 });

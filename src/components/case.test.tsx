@@ -105,15 +105,11 @@ describe("CreateCheckForm: программа субсидии", () => {
   it("показывает перечень документов программы и отправляет её код", async () => {
     const onSubmit = vi.fn().mockResolvedValue(makeApplication());
     render(<CreateCheckForm programs={[INNOVATION]} onSubmit={onSubmit} onCreated={vi.fn()} />);
-    await userEvent.type(screen.getByLabelText("Организация"), "ООО Ромашка");
-    await userEvent.type(screen.getByLabelText("ИНН"), "6161234567");
-    await userEvent.type(screen.getByLabelText("Запрашиваемая сумма"), "100000");
-    await userEvent.type(screen.getByLabelText("Проект / название субсидии"), "Платформа");
     await userEvent.selectOptions(screen.getByLabelText("Программа субсидии"), "INNOVATION");
     expect(screen.getByText("Согласие на обработку персональных данных")).toBeInTheDocument();
     expect(screen.getByText(/условно: если продукция подлежит сертификации/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Создать/ }));
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ programCode: "INNOVATION" })));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ programCode: "INNOVATION" }));
   });
 
   it("без перечня программ с сервера оставляет определение программы серверу", () => {

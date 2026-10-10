@@ -5,6 +5,7 @@ import { UploadPanel } from "./UploadPanel";
 import { DocumentDetails } from "./DocumentDetails";
 import { DocumentViewer } from "./DocumentViewer";
 import { PackageWorkspace } from "./PackageWorkspace";
+import { RequisitesPanel } from "./RequisitesPanel";
 import { jsonResponse, makeApplication, makeDocument, makeReport } from "@/test/fixtures";
 import { mockApi } from "@/test/mockApi";
 import { renderWithProviders } from "@/test/render";
@@ -128,6 +129,42 @@ describe("DocumentDetails", () => {
     expect(onChangeField).toHaveBeenCalledWith("inn", "6161234567");
   });
 
+  it("нераспознанное поле помечает «требуется проверка» и не считает извлечённым", async () => {
+    const onChangeField = vi.fn().mockResolvedValue(undefined);
+    const doc = makeDocument({
+      fields: [
+        { name: "inn", value: "6161234567", confidence: 0.95 },
+        { name: "requested_amount", value: null, status: "NOT_RECOGNIZED" },
+      ],
+    });
+    render(<DocumentDetails {...base} onChangeField={onChangeField} document={doc} />);
+    expect(screen.getByText("Не распознано / требуется проверка")).toBeInTheDocument();
+    expect(screen.getByText(/Распознано 1 из 2/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Исправить поле «Запрашиваемая сумма»" }));
+    const input = screen.getByLabelText("Значение поля «Запрашиваемая сумма»");
+    expect(input).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Сохранить поле" })).toBeDisabled();
+    await userEvent.type(input, "850000{Enter}");
+    expect(onChangeField).toHaveBeenCalledWith("requested_amount", "850000");
+  });
+
+  it("показывает историю правки: исходное значение модели и автора", () => {
+    const doc = makeDocument({
+      fields: [
+        {
+          name: "inn",
+          value: "6161234567",
+          manuallyCorrected: true,
+          originalValue: "6161234568",
+          correctedBy: "Анна Петрова",
+          correctedAt: "2026-10-10T09:00:00Z",
+        },
+      ],
+    });
+    render(<DocumentDetails {...base} document={doc} />);
+    expect(screen.getByText(/Исправлено специалистом Анна Петрова/)).toHaveTextContent("распознано моделью: 6161234568");
+  });
+
   it("сообщает, если сервер не вернул поля, и показывает замечания", () => {
     render(
       <DocumentDetails
@@ -138,6 +175,43 @@ describe("DocumentDetails", () => {
     );
     expect(screen.getByText(/не вернул извлечённые поля/)).toBeInTheDocument();
     expect(screen.getByText("Загружено несколько документов одного типа")).toBeInTheDocument();
+  });
+});
+
+describe("RequisitesPanel", () => {
+  it("показывает извлечённые реквизиты, нераспознанные и ссылку на документ-источник", async () => {
+    const onShowSource = vi.fn();
+    const app = makeApplication({
+      applicantName: null,
+      inn: null,
+      projectName: null,
+      requestedAmount: null,
+      documents: [makeDocument({ id: "d1", filename: "заявление.pdf", processingStatus: "DONE" })],
+      requisites: [
+        { name: "company_name", value: "ООО Ромашка", documentId: "d1", source: "ООО «Ромашка»" },
+        { name: "inn", value: null, status: "NOT_RECOGNIZED", documentId: "d1" },
+      ],
+    });
+    render(<RequisitesPanel app={app} onShowSource={onShowSource} />);
+    expect(screen.getByText("ООО Ромашка")).toBeInTheDocument();
+    // ИНН, проект и сумма не распознаны
+    expect(screen.getAllByText("Не распознано / требуется проверка")).toHaveLength(3);
+    expect(screen.getByText(/3 реквизита не распознаны/)).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole("button", { name: "Открыть «заявление.pdf»" })[1]);
+    expect(onShowSource).toHaveBeenCalledWith("d1");
+  });
+
+  it("пока документы разбираются, не выдаёт пустые реквизиты за нераспознанные", () => {
+    const app = makeApplication({
+      applicantName: null,
+      inn: null,
+      projectName: null,
+      requestedAmount: null,
+      documents: [makeDocument({ processingStatus: "EXTRACTING" })],
+    });
+    render(<RequisitesPanel app={app} onShowSource={vi.fn()} />);
+    expect(screen.queryByText("Не распознано / требуется проверка")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Извлекается из документов…")).toHaveLength(4);
   });
 });
 

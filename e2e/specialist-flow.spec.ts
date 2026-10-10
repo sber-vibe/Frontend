@@ -36,8 +36,6 @@ async function shot(page: Page, name: string) {
 }
 
 test("специалист проходит полный сценарий проверки пакета", async ({ page }) => {
-  const org = `ООО Ромашка ${test.info().project.name} ${Date.now().toString(36)}`;
-
   // 1. Вход
   await page.goto("/checks");
   await expect(page).toHaveURL(/\/login/);
@@ -48,18 +46,15 @@ test("специалист проходит полный сценарий про
   await page.getByRole("button", { name: "Войти" }).click();
   await expect(page.getByRole("heading", { name: "Проверки пакетов документов" })).toBeVisible();
 
-  // 2. Создание проверки с валидацией
-  await page.goto("/checks/new");
-  await page.getByRole("button", { name: /Создать и загрузить/ }).click();
-  await expect(page.getByText("Укажите ИНН")).toBeVisible();
-  await page.getByLabel("Организация").fill(org);
-  await page.getByLabel("ИНН").fill("6161234567");
-  await page.getByLabel("Запрашиваемая сумма").fill("850000");
-  await page.getByLabel("Проект / название субсидии").fill("Внедрение цифровой платформы");
+  // 2. «Новая заявка»: только программа — реквизиты вручную не вводятся
+  await page.getByRole("link", { name: "Новая заявка" }).first().click();
+  await expect(page).toHaveURL(/\/checks\/new$/);
+  await expect(page.getByLabel("ИНН")).toHaveCount(0);
   await shot(page, "02-new-check");
   await page.getByRole("button", { name: /Создать и загрузить/ }).click();
-  await expect(page.getByRole("heading", { level: 1, name: org })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Новая заявка" })).toBeVisible();
   await expect(page.getByText("Пакет пока пуст")).toBeVisible();
+  const appLink = `a[href="${new URL(page.url()).pathname}"]`;
 
   // 3. Загрузка пакета: нейтральные имена файлов, тип указывает специалист (контракт текущего backend)
   await page.getByTestId("file-input").setInputFiles([
@@ -76,6 +71,9 @@ test("специалист проходит полный сценарий про
   await page.getByRole("button", { name: "Загрузить (3)" }).click();
   const list = page.getByRole("navigation", { name: "Документы пакета" });
   await expect(list.getByRole("button")).toHaveCount(3);
+
+  // карточка заявки заполняется по документам; нераспознанное — «требуется проверка»
+  await expect(page.getByRole("region", { name: "Реквизиты заявки" })).toBeVisible();
 
   // 4. Просмотр оригинала рядом с разбором
   await list.getByText("scan4.png").click();
@@ -94,7 +92,7 @@ test("специалист проходит полный сценарий про
   // 6. Протокол проверки
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Скачать протокол" }).click();
-  expect((await download).suggestedFilename()).toMatch(/^protocol_6161234567_\d{4}-\d{2}-\d{2}\.txt$/);
+  expect((await download).suggestedFilename()).toMatch(/^protocol_\w+_\d{4}-\d{2}-\d{2}\.txt$/);
 
   // 7. Исправление типа: доп. документ на самом деле — выписка ЕГРЮЛ
   await page.getByRole("link", { name: "Дозагрузить документы" }).click();
@@ -122,13 +120,13 @@ test("специалист проходит полный сценарий про
 
   // 10. Дашборд: проверка в списке, фильтр работает
   await page.goto("/checks");
-  await expect(page.getByRole("link", { name: new RegExp(org) })).toBeVisible();
+  await expect(page.locator(appLink)).toBeVisible();
   await shot(page, "07-dashboard");
   await page.getByRole("tab", { name: "Есть ошибки" }).click();
   // фон выбранного фильтра действительно отрисован (регрессия: «пилюля» схлопывалась и текст был белым на белом)
   const pill = await page.getByRole("tab", { name: "Есть ошибки" }).locator("span").first().boundingBox();
   expect(pill?.width ?? 0).toBeGreaterThan(40);
-  await expect(page.getByRole("link", { name: new RegExp(org) })).toHaveCount(0);
+  await expect(page.locator(appLink)).toHaveCount(0);
 });
 
 test("нет горизонтальной прокрутки на ключевых экранах", async ({ page }) => {

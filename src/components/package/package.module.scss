@@ -1118,3 +1118,93 @@
   color: var(--text-3);
   font-style: italic;
 }
+
+/* ---------- Реквизиты заявки, извлечённые из пакета ---------- */
+.requisites {
+  @include card;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+
+  @include up(md) {
+    padding: 22px 28px;
+  }
+}
+
+.requisitesHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 16px;
+
+  h2 {
+    margin: 0;
+    font-size: 18px;
+  }
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+.requisitesList {
+  display: grid;
+  gap: 14px 24px;
+  margin: 0;
+
+  @include up(md) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.requisite {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+
+  dt {
+    font-size: 13px;
+    color: var(--text-3);
+  }
+
+  dd {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    margin: 0;
+    min-width: 0;
+  }
+}
+
+.fieldHistory {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+.sourceLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green-700);
+  font-size: 13px;
+  text-align: left;
+  overflow-wrap: anywhere;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

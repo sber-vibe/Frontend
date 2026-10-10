@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { pluralize } from "@/lib/format";
+import { applicationTitle } from "@/lib/requisites";
 import { expiringDocuments, frequentFindings } from "@/lib/presentation";
 import type { ApplicationView } from "@/lib/types";
 import { Icon } from "@/components/ui";
@@ -50,7 +51,7 @@ export function Insights({ apps }: { apps: ApplicationView[] }) {
               <li key={`${app.id}-${i}`} data-expired={finding.code === "DOCUMENT_EXPIRED"}>
                 <Icon name={finding.code === "DOCUMENT_EXPIRED" ? "error" : "alert"} size={18} />
                 <Link href={`/checks/${app.id}${finding.documentId ? `?doc=${finding.documentId}` : ""}`}>
-                  <b>{app.applicantName}</b>
+                  <b>{applicationTitle(app)}</b>
                   <small>{finding.message}</small>
                 </Link>
               </li>

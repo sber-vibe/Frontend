@@ -14,13 +14,13 @@ describe("api client", () => {
     expect(fetchSpy).toHaveBeenCalledWith("/api/v1/applications", expect.any(Object));
   });
 
-  it("создаёт проверку POST-запросом с JSON", async () => {
+  it("создаёт заявку POST-запросом с JSON — только программа, без реквизитов", async () => {
     const fetchSpy = mockFetch(jsonResponse(makeApplication(), 201));
-    await api.createApplication({ applicantName: "ООО", inn: "6161234567", projectName: "P", requestedAmount: 10 });
+    await api.createApplication({ programCode: "INNOVATION" });
     const [url, init] = fetchSpy.mock.calls[0];
     expect(url).toBe("/api/v1/applications");
     expect(init?.method).toBe("POST");
-    expect(JSON.parse(init?.body as string)).toMatchObject({ inn: "6161234567", requestedAmount: 10 });
+    expect(JSON.parse(init?.body as string)).toEqual({ programCode: "INNOVATION" });
     expect(new Headers(init?.headers).get("Content-Type")).toBe("application/json");
   });
 

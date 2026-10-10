@@ -49,7 +49,7 @@ export function ChecksDashboard() {
           <p className={s.heroSub}>Загрузите пакет документов — сервер сам определит, что в каждом файле, проверит комплектность и правила. Вы проверяете результат, а не документы.</p>
         </div>
         <ButtonLink href="/checks/new" icon="plus" size="lg" variant="secondary" className={s.heroButton}>
-          Новая проверка
+          Новая заявка
         </ButtonLink>
       </motion.section>
 

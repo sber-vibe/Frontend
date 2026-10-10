@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
+import { applicationTitle, requisiteText } from "@/lib/requisites";
 import { useAsync } from "@/lib/useAsync";
 import { BackLink } from "@/components/BackLink";
 import { JournalList } from "@/components/journal/JournalList";
@@ -32,7 +33,7 @@ export default function JournalPage() {
           <h1>Журнал проверки</h1>
           {data && (
             <p>
-              {data.app.applicantName} · ИНН {data.app.inn}
+              {applicationTitle(data.app)} · ИНН {requisiteText(data.app, "inn")}
             </p>
           )}
         </div>

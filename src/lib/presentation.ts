@@ -219,7 +219,7 @@ export function matchesFilter(app: ApplicationView, filter: DashboardFilter): bo
 export function matchesSearch(app: ApplicationView, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return [app.applicantName, app.inn, app.projectName, app.programName ?? ""].some((v) => v.toLowerCase().includes(q));
+  return [app.applicantName, app.inn, app.projectName, app.programName].some((v) => (v ?? "").toLowerCase().includes(q));
 }
 
 /* ---------- Документы ---------- */

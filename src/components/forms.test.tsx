@@ -34,64 +34,40 @@ describe("LoginForm", () => {
 });
 
 describe("CreateCheckForm", () => {
-  async function fill(values: Partial<Record<string, string>>) {
-    const map: Record<string, string> = {
-      org: "Организация",
-      inn: "ИНН",
-      amount: "Запрашиваемая сумма",
-      project: "Проект / название субсидии",
-    };
-    for (const [key, value] of Object.entries(values)) {
-      if (value) await userEvent.type(screen.getByLabelText(map[key]), value);
-    }
-  }
+  const programs = [
+    { code: "INNOVATION", name: "Инновационный проект", documents: [{ type: "APPLICATION", requirement: "REQUIRED" as const }] },
+  ];
 
-  it("показывает ошибки валидации и не отправляет пустую форму", async () => {
-    const onSubmit = vi.fn();
-    render(<CreateCheckForm onSubmit={onSubmit} onCreated={vi.fn()} />);
-    await userEvent.click(screen.getByRole("button", { name: /Создать/ }));
-    const alerts = screen.getAllByRole("alert").map((a) => a.textContent);
-    expect(alerts).toEqual(
-      expect.arrayContaining(["Укажите организацию", "Укажите ИНН", "Укажите сумму", "Укажите название проекта или субсидии"]),
-    );
-    expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("ИНН")).toHaveAttribute("aria-invalid", "true");
+  it("не просит вводить организацию, ИНН и сумму — их извлечёт сервер", () => {
+    render(<CreateCheckForm onSubmit={vi.fn()} onCreated={vi.fn()} programs={programs} />);
+    expect(screen.queryByLabelText("Организация")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("ИНН")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Запрашиваемая сумма")).not.toBeInTheDocument();
+    expect(screen.getByText(/распознает их в документах/)).toBeInTheDocument();
   });
 
-  it("в поле ИНН принимает только цифры, не длиннее 12", async () => {
-    render(<CreateCheckForm onSubmit={vi.fn()} onCreated={vi.fn()} />);
-    await fill({ inn: "61a6-1234 5678999" });
-    expect(screen.getByLabelText("ИНН")).toHaveValue("616123456789");
-  });
-
-  it("отправляет корректные данные и сообщает о создании", async () => {
-    const created = makeApplication();
+  it("по умолчанию оставляет определение программы серверу", async () => {
+    const created = makeApplication({ applicantName: null, inn: null, projectName: null, requestedAmount: null });
     const onSubmit = vi.fn().mockResolvedValue(created);
     const onCreated = vi.fn();
-    render(<CreateCheckForm onSubmit={onSubmit} onCreated={onCreated} />);
-    await fill({ org: "ООО Ромашка", inn: "6161234567", amount: "850 000,50", project: "Цифровая платформа" });
+    render(<CreateCheckForm onSubmit={onSubmit} onCreated={onCreated} programs={programs} />);
     await userEvent.click(screen.getByRole("button", { name: /Создать/ }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(created));
-    expect(onSubmit).toHaveBeenCalledWith({
-      applicantName: "ООО Какие люди",
-      inn: "6161234567",
-      projectName: "Цифровая платформа",
-      requestedAmount: 850000.5,
-      programCode: null,
-    });
+    expect(onSubmit).toHaveBeenCalledWith({ programCode: null });
   });
 
-  it("исправление поля после ошибки сразу снимает подсветку", async () => {
-    render(<CreateCheckForm onSubmit={vi.fn()} onCreated={vi.fn()} />);
+  it("отправляет выбранную программу и показывает её перечень документов", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(makeApplication());
+    render(<CreateCheckForm onSubmit={onSubmit} onCreated={vi.fn()} programs={programs} />);
+    await userEvent.selectOptions(screen.getByLabelText("Программа субсидии"), "INNOVATION");
+    expect(screen.getByText("Документы программы")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Создать/ }));
-    await fill({ inn: "6161234567" });
-    expect(screen.getByLabelText("ИНН")).not.toHaveAttribute("aria-invalid");
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ programCode: "INNOVATION" }));
   });
 
   it("показывает ошибку сервера и позволяет повторить", async () => {
     const onSubmit = vi.fn().mockRejectedValue(new ApiError(409, "Достигнут лимит проверок"));
-    render(<CreateCheckForm onSubmit={onSubmit} onCreated={vi.fn()} />);
-    await fill({ org: "ООО", inn: "6161234567", amount: "100", project: "П" });
+    render(<CreateCheckForm onSubmit={onSubmit} onCreated={vi.fn()} programs={null} />);
     await userEvent.click(screen.getByRole("button", { name: /Создать/ }));
     expect(await screen.findByText("Достигнут лимит проверок")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Создать/ })).toBeEnabled();

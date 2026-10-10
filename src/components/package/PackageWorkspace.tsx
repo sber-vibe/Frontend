@@ -6,8 +6,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { config } from "@/lib/config";
 import { selectableTypes } from "@/lib/documentTypes";
-import { formatMoney, pluralize } from "@/lib/format";
+import { pluralize } from "@/lib/format";
 import { DECISION_VIEW, documentFindings, isProcessing, needsPolling, reportStatusView } from "@/lib/presentation";
+import { applicationTitle, NOT_RECOGNIZED, recognizedInn, requisiteView, type RequisiteView } from "@/lib/requisites";
 import { errorMessage, useAsync } from "@/lib/useAsync";
 import type { ApplicationView, DocumentTypeCode, DocumentView } from "@/lib/types";
 import { BackLink } from "@/components/BackLink";
@@ -18,10 +19,17 @@ import { useToast } from "@/components/ui/Toast";
 import { DocumentDetails } from "./DocumentDetails";
 import { DocumentList } from "./DocumentList";
 import { DocumentViewer } from "./DocumentViewer";
+import { RequisitesPanel } from "./RequisitesPanel";
 import { UploadPanel } from "./UploadPanel";
 import s from "./package.module.scss";
 
 type MobileTab = "original" | "details";
+
+/** Значение реквизита в шапке: «не распознано» выделяется, а не выглядит как пустое значение. */
+function HeaderValue({ view }: { view: RequisiteView }) {
+  if (view.kind === "missing") return <Badge tone="warning">{NOT_RECOGNIZED}</Badge>;
+  return <>{view.text}</>;
+}
 
 export function PackageWorkspace({ id }: { id: string }) {
   const router = useRouter();
@@ -89,6 +97,13 @@ export function PackageWorkspace({ id }: { id: string }) {
   const docFindings = selected ? documentFindings(selected, app.report) : [];
   const processingCount = app.documents.filter(isProcessing).length;
   const decision = app.decision ? DECISION_VIEW[app.decision.decision] : null;
+  const inn = recognizedInn(app);
+  const project = requisiteView(app, "project_name");
+
+  const selectDocument = (docId: string) => {
+    setSelectedId(docId);
+    router.replace(`/checks/${id}?doc=${docId}`, { scroll: false });
+  };
 
   const replaceDocument = (oldId: string, next: DocumentView) =>
     setApp((a) => ({ ...a, report: null, documents: a.documents.map((d) => (d.id === oldId ? next : d)) }));
@@ -179,11 +194,11 @@ export function PackageWorkspace({ id }: { id: string }) {
       <motion.header className={s.header} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         <div className={s.headerMain}>
           <div className={s.headerTitle}>
-            <h1>{app.applicantName}</h1>
+            <h1>{applicationTitle(app)}</h1>
             <Badge tone={status.tone}>{status.label}</Badge>
             {decision && <Badge tone={decision.tone}>Решение: {decision.label}</Badge>}
           </div>
-          <p className={s.headerProject}>{app.projectName}</p>
+          {project.kind === "value" && <p className={s.headerProject}>{project.text}</p>}
           <dl className={s.headerFacts}>
             <div>
               <dt>Программа</dt>
@@ -195,14 +210,20 @@ export function PackageWorkspace({ id }: { id: string }) {
             <div>
               <dt>ИНН</dt>
               <dd>
-                <Link href={`/organizations/${app.inn}`} title="История проверок организации">
-                  {app.inn}
-                </Link>
+                {inn ? (
+                  <Link href={`/organizations/${inn}`} title="История проверок организации">
+                    {inn}
+                  </Link>
+                ) : (
+                  <HeaderValue view={requisiteView(app, "inn")} />
+                )}
               </dd>
             </div>
             <div>
               <dt>Сумма субсидии</dt>
-              <dd>{formatMoney(app.requestedAmount)}</dd>
+              <dd>
+                <HeaderValue view={requisiteView(app, "requested_amount")} />
+              </dd>
             </div>
             <div>
               <dt>Документов</dt>
@@ -280,11 +301,21 @@ export function PackageWorkspace({ id }: { id: string }) {
         }}
       />
 
+      {docsCount > 0 && (
+        <RequisitesPanel
+          app={app}
+          onShowSource={(docId) => {
+            selectDocument(docId);
+            setTab("details");
+          }}
+        />
+      )}
+
       {docsCount === 0 ? (
         <EmptyState
           icon="upload"
           title="Пакет пока пуст"
-          text="Перетащите файлы в область выше. Сервер определит тип каждого документа и извлечёт данные."
+          text="Перетащите файлы в область выше. Сервер определит тип каждого документа и заполнит карточку заявки: организацию, ИНН, проект и сумму."
         />
       ) : (
         <div className={s.workspace}>
@@ -292,10 +323,7 @@ export function PackageWorkspace({ id }: { id: string }) {
             documents={app.documents}
             report={app.report}
             selectedId={selectedId}
-            onSelect={(docId) => {
-              setSelectedId(docId);
-              router.replace(`/checks/${id}?doc=${docId}`, { scroll: false });
-            }}
+            onSelect={selectDocument}
           />
 
           <div className={s.mobileTabs} role="tablist" aria-label="Режим просмотра">

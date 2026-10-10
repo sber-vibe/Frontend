@@ -362,6 +362,12 @@
   margin-top: 10px;
   font-size: 14px;
   color: var(--text-3);
+
+  /* реквизит не распознан — требуется проверка */
+  [data-missing] {
+    color: #8a5300;
+    font-weight: 600;
+  }
 }
 
 .metaDot {

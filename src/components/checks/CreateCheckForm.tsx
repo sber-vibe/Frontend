@@ -3,18 +3,10 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { formatMoney } from "@/lib/format";
 import { errorMessage } from "@/lib/useAsync";
-import {
-  parseAmount,
-  toCreateApplication,
-  validateCreateCheck,
-  type CreateCheckErrors,
-  type CreateCheckValues,
-} from "@/lib/validation";
 import { typeTitle } from "@/lib/documentTypes";
 import type { ApplicationView, CreateApplication, Program } from "@/lib/types";
-import { Button, Icon, SelectField, TextField } from "@/components/ui";
+import { Button, Icon, SelectField } from "@/components/ui";
 import s from "./form.module.scss";
 
 interface Props {
@@ -24,8 +16,6 @@ interface Props {
   /** Программы субсидий с сервера; null — сервер их пока не отдаёт, undefined — загружаются. */
   programs?: Program[] | null;
 }
-
-const EMPTY: CreateCheckValues = { applicantName: "", inn: "", projectName: "", requestedAmount: "", programCode: "" };
 
 /** Перечень документов выбранной программы — как его прислал сервер. */
 function ProgramDocuments({ program }: { program: Program }) {
@@ -56,31 +46,21 @@ function ProgramDocuments({ program }: { program: Program }) {
   );
 }
 
+/**
+ * Создание заявки: специалист выбирает только программу (или оставляет автоопределение).
+ * Организацию, ИНН, проект и сумму сервер извлечёт из загруженного пакета.
+ */
 export function CreateCheckForm({ onSubmit, onCreated, onCancel, programs }: Props) {
-  const [values, setValues] = useState(EMPTY);
-  const [errors, setErrors] = useState<CreateCheckErrors>({});
-  const [touched, setTouched] = useState(false);
+  const [programCode, setProgramCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const set = (key: keyof CreateCheckValues) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const next = { ...values, [key]: key === "inn" ? e.target.value.replace(/\D/g, "").slice(0, 12) : e.target.value };
-    setValues(next);
-    // после первой попытки отправки подсвечиваем ошибки «на лету»
-    if (touched) setErrors(validateCreateCheck(next));
-  };
-
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    setTouched(true);
-    const found = validateCreateCheck(values);
-    setErrors(found);
-    if (Object.keys(found).length > 0) return;
-
     setSubmitting(true);
     setServerError(null);
     try {
-      const created = await onSubmit(toCreateApplication(values));
+      const created = await onSubmit({ programCode: programCode || null });
       onCreated(created);
     } catch (err) {
       setServerError(errorMessage(err));
@@ -88,12 +68,11 @@ export function CreateCheckForm({ onSubmit, onCreated, onCancel, programs }: Pro
     }
   };
 
-  const amount = parseAmount(values.requestedAmount);
   const activePrograms = (programs ?? []).filter((p) => p.active !== false);
-  const selectedProgram = activePrograms.find((p) => p.code === values.programCode);
+  const selectedProgram = activePrograms.find((p) => p.code === programCode);
 
   return (
-    <form className={s.form} onSubmit={submit} noValidate aria-label="Новая проверка">
+    <form className={s.form} onSubmit={submit} noValidate aria-label="Новая заявка">
       <AnimatePresence>
         {serverError && (
           <motion.div
@@ -109,49 +88,6 @@ export function CreateCheckForm({ onSubmit, onCreated, onCancel, programs }: Pro
         )}
       </AnimatePresence>
 
-      <TextField
-        label="Организация"
-        placeholder="ООО «Ромашка»"
-        value={values.applicantName}
-        onChange={set("applicantName")}
-        error={errors.applicantName}
-        maxLength={200}
-        autoComplete="organization"
-      />
-      <div className={s.row}>
-        <TextField
-          label="ИНН"
-          placeholder="10 или 12 цифр"
-          inputMode="numeric"
-          value={values.inn}
-          onChange={set("inn")}
-          error={errors.inn}
-          hint={values.inn ? `${values.inn.length} из ${values.inn.length > 10 ? 12 : 10} цифр` : "Юрлицо — 10 цифр, ИП — 12"}
-        />
-        <TextField
-          label="Запрашиваемая сумма"
-          placeholder="850 000"
-          inputMode="decimal"
-          suffix="₽"
-          value={values.requestedAmount}
-          onChange={set("requestedAmount")}
-          onBlur={() => {
-            if (Number.isFinite(amount) && amount > 0) {
-              setValues((v) => ({ ...v, requestedAmount: formatMoney(amount).replace(" ₽", "") }));
-            }
-          }}
-          error={errors.requestedAmount}
-        />
-      </div>
-      <TextField
-        label="Проект / название субсидии"
-        placeholder="Например, «Внедрение цифровой платформы»"
-        value={values.projectName}
-        onChange={set("projectName")}
-        error={errors.projectName}
-        maxLength={300}
-      />
-
       {programs === null ? (
         <p className={s.note}>
           <Icon name="info" size={16} /> Сервер пока не отдаёт перечень программ — программу определит backend из заявления.
@@ -159,23 +95,28 @@ export function CreateCheckForm({ onSubmit, onCreated, onCancel, programs }: Pro
       ) : (
         <SelectField
           label="Программа субсидии"
-          value={values.programCode}
-          onChange={set("programCode")}
+          value={programCode}
+          onChange={(e) => setProgramCode(e.target.value)}
           disabled={programs === undefined}
           hint={
             programs === undefined
               ? "Загружаем программы…"
-              : values.programCode
+              : programCode
                 ? "Перечень обязательных документов зависит от программы"
                 : "Сервер определит программу по содержимому заявления"
           }
           options={[
-            { value: "", label: "Определить из заявления" },
+            { value: "", label: "Определить автоматически" },
             ...activePrograms.map((p) => ({ value: p.code, label: p.name })),
           ]}
         />
       )}
       <AnimatePresence>{selectedProgram && <ProgramDocuments key={selectedProgram.code} program={selectedProgram} />}</AnimatePresence>
+
+      <p className={s.note}>
+        <Icon name="sparkle" size={16} /> Организацию, ИНН, проект и сумму вводить не нужно: система распознает их в документах
+        пакета и заполнит карточку заявки. Что не удастся прочитать, будет отмечено для проверки.
+      </p>
 
       <div className={s.actions}>
         {onCancel && (
@@ -184,7 +125,7 @@ export function CreateCheckForm({ onSubmit, onCreated, onCancel, programs }: Pro
           </Button>
         )}
         <Button type="submit" size="lg" loading={submitting} iconRight="arrowRight">
-          Создать и загрузить документы
+          Создать и загрузить пакет
         </Button>
       </div>
     </form>

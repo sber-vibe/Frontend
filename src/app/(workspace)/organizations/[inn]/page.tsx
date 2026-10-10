@@ -3,7 +3,8 @@
 import { motion } from "framer-motion";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { formatDateTime, formatMoney, pluralize } from "@/lib/format";
+import { formatDateTime, pluralize } from "@/lib/format";
+import { requisiteText } from "@/lib/requisites";
 import { DECISION_VIEW, groupFindings, reportStatusView } from "@/lib/presentation";
 import { useAsync } from "@/lib/useAsync";
 import { BackLink } from "@/components/BackLink";
@@ -19,7 +20,7 @@ export default function OrganizationPage() {
   const apps = (data ?? [])
     .filter((a) => a.inn === inn)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const name = apps[0]?.applicantName;
+  const name = apps.find((a) => a.applicantName)?.applicantName;
 
   return (
     <div className={s.page}>
@@ -56,12 +57,12 @@ export default function OrganizationPage() {
                 transition={{ delay: Math.min(i, 8) * 0.05 }}
               >
                 <div className={c.cardTitleRow}>
-                  <h2 style={{ margin: 0 }}>{app.projectName}</h2>
+                  <h2 style={{ margin: 0 }}>{requisiteText(app, "project_name")}</h2>
                   <Badge tone={status.tone}>{status.label}</Badge>
                   {decision && <Badge tone={decision.tone}>{decision.label}</Badge>}
                 </div>
                 <p className={c.cardMeta}>
-                  {formatDateTime(app.createdAt)} · {formatMoney(app.requestedAmount)}
+                  {formatDateTime(app.createdAt)} · {requisiteText(app, "requested_amount")}
                   {app.programName ? ` · ${app.programName}` : ""}
                 </p>
                 {issues.length > 0 && (

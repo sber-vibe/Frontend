@@ -9,7 +9,7 @@ import s from "./AppHeader.module.scss";
 
 const NAV = [
   { href: "/checks", label: "Проверки", exact: true },
-  { href: "/checks/new", label: "Новая проверка", exact: true },
+  { href: "/checks/new", label: "Новая заявка", exact: true },
 ];
 
 const ADMIN_NAV = { href: "/admin", label: "Администрирование", exact: false };
@@ -47,7 +47,7 @@ export function AppHeader({ userName, isAdmin, onLogout }: { userName: string; i
         </nav>
 
         <div className={s.right}>
-          <ButtonLink href="/checks/new" size="sm" icon="plus" className={s.mobileNew} iconOnly aria-label="Новая проверка" />
+          <ButtonLink href="/checks/new" size="sm" icon="plus" className={s.mobileNew} iconOnly aria-label="Новая заявка" />
           <div className={s.user} title={userName}>
             <span className={s.avatar}>{initials(userName) || "С"}</span>
             <span className={s.userName}>

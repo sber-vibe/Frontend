@@ -12,9 +12,9 @@ import type { Program } from "@/lib/types";
 import s from "./new.module.scss";
 
 const STEPS = [
-  { title: "Заявка и программа", text: "Организация, ИНН, сумма и программа субсидии" },
-  { title: "Загрузка пакета", text: "PDF, DOC/DOCX, XLS/XLSX, сканы и фото — сразу несколько файлов" },
-  { title: "Проверка в фоне", text: "Тип по содержимому, комплектность, сроки, ИНН, доля собственных средств" },
+  { title: "Программа субсидии", text: "Выберите программу или оставьте автоматическое определение" },
+  { title: "Загрузка пакета", text: "PDF, DOC/DOCX, XLS/XLSX, сканы и фото — без ручного ввода реквизитов" },
+  { title: "Распознавание и проверка", text: "Тип и реквизиты по содержимому, карточка заявки, комплектность, сроки, суммы" },
 ];
 
 export default function NewCheckPage() {
@@ -37,13 +37,13 @@ export default function NewCheckPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         >
-          <h1>Новая проверка</h1>
-          <p className={s.lead}>Укажите данные организации, которая претендует на субсидию.</p>
+          <h1>Новая заявка</h1>
+          <p className={s.lead}>Выберите программу субсидии — остальное система возьмёт из документов пакета.</p>
           <CreateCheckForm
             programs={programs}
             onSubmit={api.createApplication}
             onCreated={(app) => {
-              toast.success("Проверка создана", "Теперь загрузите пакет документов");
+              toast.success("Заявка создана", "Загрузите пакет — реквизиты заполнятся по документам");
               router.push(`/checks/${app.id}`);
             }}
             onCancel={() => router.push("/checks")}

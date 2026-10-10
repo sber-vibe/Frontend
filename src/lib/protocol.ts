@@ -1,6 +1,7 @@
 import { typeShort, typeTitle } from "./documentTypes";
-import { formatDateTime, formatMoney } from "./format";
+import { formatDateTime } from "./format";
 import { completenessRows, DECISION_VIEW, findingSeverity, groupFindings, reportStatusView } from "./presentation";
+import { requisiteText } from "./requisites";
 import type { ApplicationView, CheckReport, Finding } from "./types";
 
 const SEVERITY_LABEL = { ERROR: "Ошибка", WARNING: "Требует внимания", INFO: "Информация", OK: "Пройдено" } as const;
@@ -22,11 +23,11 @@ export function buildProtocol(app: ApplicationView, report: CheckReport, require
   const lines = [
     "ПРОТОКОЛ ПРОВЕРКИ ПАКЕТА ДОКУМЕНТОВ НА СУБСИДИЮ",
     "",
-    `Организация: ${app.applicantName}`,
-    `ИНН: ${app.inn}`,
-    `Проект: ${app.projectName}`,
+    `Организация: ${requisiteText(app, "company_name")}`,
+    `ИНН: ${requisiteText(app, "inn")}`,
+    `Проект: ${requisiteText(app, "project_name")}`,
     app.programName ? `Программа субсидии: ${app.programName}` : null,
-    `Запрашиваемая сумма: ${formatMoney(app.requestedAmount)}`,
+    `Запрашиваемая сумма: ${requisiteText(app, "requested_amount")}`,
     `Дата проверки: ${formatDateTime(report.checkedAt)}`,
     specialist ? `Специалист: ${specialist}` : null,
     "",

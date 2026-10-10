@@ -50,11 +50,31 @@
 ### `POST /applications`
 
 ```json
-{ "applicantName": "ООО «Ромашка»", "inn": "6161234567", "projectName": "Платформа",
-  "requestedAmount": 850000, "programCode": "INNOVATION" }
+{ "programCode": "INNOVATION" }
 ```
 
-`programCode: null` — определить программу из заявления.
+Специалист вводит **только программу** (`null` — определить из заявления). Организацию, ИНН, проект и сумму
+сервер извлекает из документов пакета и заполняет карточку заявки. Ручной ввод реквизитов при создании не
+заменяет извлечение: арифметические проверки выполняются на извлечённых числах.
+
+### `ApplicationView` — реквизиты из документов
+
+`applicantName`, `inn`, `projectName`, `requestedAmount` — `null`, пока не извлечены или не распознаны.
+
+`requisites[]` — реквизиты карточки с источником (`ExtractedField` + `documentId`):
+
+```json
+[ { "name": "company_name", "value": "ООО «Ромашка»", "status": "RECOGNIZED", "documentId": "d1",
+    "source": "Заявитель: ООО «Ромашка»", "confidence": 0.93 },
+  { "name": "inn", "value": null, "status": "NOT_RECOGNIZED", "documentId": "d1" },
+  { "name": "requested_amount", "value": 900000, "status": "RECOGNIZED", "documentId": "d1",
+    "manuallyCorrected": true, "originalValue": 850000, "correctedBy": "Анна Петрова",
+    "correctedAt": "2026-10-10T09:00:00Z" } ]
+```
+
+Имена: `company_name`, `inn`, `project_name`, `requested_amount` (+ любые дополнительные, например `kpp`).
+Пока файлы обрабатываются, фронт пишет «Извлекается из документов…»; после обработки пустое значение или
+`status: "NOT_RECOGNIZED"` показывается как **«Не распознано / требуется проверка»** и не считается извлечённым.
 
 ### `ApplicationView` — новые поля
 
@@ -90,12 +110,15 @@
 | `typeSource` | `MODEL` / `SPECIALIST` | «Определено моделью» или «Тип указан специалистом …» |
 | `typeChangedBy`, `typeChangedAt` | автор и время ручной правки | рядом с типом |
 | `outcome` | `PASSED` / `ATTENTION` / `ERRORS` | итог по файлу в списке документов |
-| `fields[]` | `{ name, value, confidence, manuallyCorrected, source }` | `source` — фрагмент текста, где найдено значение |
+| `fields[]` | `{ name, value, status, confidence, source, manuallyCorrected, originalValue, correctedBy, correctedAt }` | `source` — фрагмент текста; `NOT_RECOGNIZED` или пустое `value` — «Не распознано / требуется проверка»; при правке — история «распознано моделью: … · исправил …» |
 
 ### `PATCH /applications/{id}/documents/{documentId}` → `DocumentView`
 
 `{ "type": "GUARANTEE_LETTER" }` или `{ "fields": [{ "name": "inn", "value": "6161234567" }] }`.
 Сервер ставит `typeSource: "SPECIALIST"`, пересчитывает проверку и пишет журнал.
+При правке поля сервер сохраняет исходное значение модели в `originalValue` (не перезаписывает его при
+повторных правках), ставит `manuallyCorrected: true`, `status: "RECOGNIZED"`, `correctedBy` из JWT и `correctedAt`,
+обновляет соответствующий реквизит в `requisites[]` и пишет `FIELD_CHANGED` в журнал.
 
 ### `POST /applications/{id}/documents/{documentId}/reprocess` → `DocumentView`
 
