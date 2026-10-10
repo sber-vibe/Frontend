@@ -115,7 +115,7 @@ export function UploadPanel({ types, upload, onUploaded, compact }: Props) {
         <div>
           <p className={s.dropTitle}>{dragging ? "Отпустите файлы" : "Перетащите документы сюда"}</p>
           <p className={s.dropHint}>
-            или <span className={s.dropLink}>выберите на устройстве</span> · можно сразу несколько файлов · {config.acceptedFormatsLabel} до 10 МБ
+            или <span className={s.dropLink}>выберите на устройстве</span> · можно сразу несколько файлов · {config.acceptedFormatsLabel} до 50 МБ
           </p>
         </div>
         <input

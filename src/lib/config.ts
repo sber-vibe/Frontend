@@ -18,7 +18,7 @@ export const config = {
   confidenceThreshold: parseThreshold(process.env.NEXT_PUBLIC_CONFIDENCE_THRESHOLD),
   /** Как часто опрашивать сервер, пока документы обрабатываются в фоне, мс. */
   pollInterval: parseInterval(process.env.NEXT_PUBLIC_POLL_INTERVAL_MS),
-  maxFileSize: 10 * 1024 * 1024,
+  maxFileSize: 50 * 1024 * 1024,
   /** Форматы из кейса; окончательно формат проверяет сервер. */
   acceptedExtensions: ["pdf", "doc", "docx", "xls", "xlsx", "jpg", "jpeg", "png"],
   acceptedFormatsLabel: "PDF, DOC/DOCX, XLS/XLSX, JPG/PNG",
