@@ -44,7 +44,7 @@ describe("UploadPanel", () => {
       ["a.pdf", "APPLICATION"],
       ["b.pdf", "COST_ESTIMATE"],
     ]);
-    expect(screen.getAllByText("Загружено")).toHaveLength(2);
+    expect(screen.getAllByText("Принят")).toHaveLength(2);
   });
 
   it("показывает ошибку сервера у конкретного файла", async () => {
@@ -79,7 +79,7 @@ describe("DocumentDetails", () => {
 
   it("при низкой уверенности не выдаёт результат за точный", () => {
     render(<DocumentDetails {...base} document={makeDocument({ type: null, detectedType: "APPLICATION", confidence: 0.63 })} />);
-    expect(screen.getByRole("heading")).toHaveTextContent("Предположительно: Заявление на предоставление субсидии");
+    expect(screen.getByRole("heading")).toHaveTextContent("Предположительно: Заявление на субсидию");
     expect(screen.getByText("Тип документа требует подтверждения специалиста")).toBeInTheDocument();
     expect(screen.getByRole("meter")).toHaveAttribute("aria-valuenow", "63");
   });

@@ -21,7 +21,7 @@ describe("LoginForm", () => {
     render(<LoginForm oidcEnabled={false} onDemoLogin={onDemoLogin} onOidcLogin={vi.fn()} />);
     await userEvent.type(screen.getByLabelText("Имя специалиста"), "  Анна Петрова ");
     await userEvent.click(screen.getByRole("button", { name: "Войти" }));
-    expect(onDemoLogin).toHaveBeenCalledWith("Анна Петрова");
+    expect(onDemoLogin).toHaveBeenCalledWith("Анна Петрова", "specialist");
   });
 
   it("при настроенном Keycloak предлагает вход через OIDC", async () => {
@@ -77,6 +77,7 @@ describe("CreateCheckForm", () => {
       inn: "6161234567",
       projectName: "Цифровая платформа",
       requestedAmount: 850000.5,
+      programCode: null,
     });
   });
 

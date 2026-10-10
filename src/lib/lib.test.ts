@@ -55,7 +55,7 @@ describe("format", () => {
 });
 
 describe("validation", () => {
-  const valid = { applicantName: "ООО Ромашка", inn: "6161234567", projectName: "Проект", requestedAmount: "850 000" };
+  const valid = { applicantName: "ООО Ромашка", inn: "6161234567", projectName: "Проект", requestedAmount: "850 000", programCode: "" };
 
   it("пропускает корректные данные", () => {
     expect(validateCreateCheck(valid)).toEqual({});
@@ -64,7 +64,9 @@ describe("validation", () => {
       inn: "6161234567",
       projectName: "Проект",
       requestedAmount: 850000,
+      programCode: null,
     });
+    expect(toCreateApplication({ ...valid, programCode: "INNOVATION" }).programCode).toBe("INNOVATION");
   });
 
   it("проверяет ИНН: только цифры, 10 или 12 знаков", () => {
@@ -75,7 +77,7 @@ describe("validation", () => {
   });
 
   it("проверяет сумму и обязательные поля", () => {
-    const errors = validateCreateCheck({ applicantName: " ", inn: "6161234567", projectName: "", requestedAmount: "0" });
+    const errors = validateCreateCheck({ applicantName: " ", inn: "6161234567", projectName: "", requestedAmount: "0", programCode: "" });
     expect(errors.applicantName).toBeDefined();
     expect(errors.projectName).toBeDefined();
     expect(errors.requestedAmount).toBe("Сумма должна быть больше нуля");
@@ -139,17 +141,27 @@ describe("presentation", () => {
     expect(reportStatusView(null, 0).label).toBe("Ожидает документы");
     expect(reportStatusView(null, 2).label).toBe("Не проверено");
     expect(reportStatusView(makeReport()).tone).toBe("danger");
-    expect(reportStatusView(makeReport({ status: "REVIEW_REQUIRED" })).label).toBe("Готов к экспертизе");
+    expect(reportStatusView(makeReport({ status: "REVIEW_REQUIRED" })).label).toBe("Требует внимания");
+    expect(reportStatusView(makeReport({ status: "PASSED" })).label).toBe("Пройдено");
+    expect(reportStatusView(makeReport({ status: "ATTENTION" })).tone).toBe("warning");
+    expect(reportStatusView(makeReport({ status: "ERRORS" })).label).toBe("Есть ошибки");
     expect(reportStatusView(makeReport({ status: "CUSTOM" })).label).toBe("CUSTOM");
   });
 
   it("фильтрует и ищет проверки на дашборде", () => {
     const waiting = makeApplication();
     const failed = makeApplication({ report: makeReport() });
-    const ok = makeApplication({ report: makeReport({ status: "REVIEW_REQUIRED" }) });
-    expect([waiting, failed, ok].filter((a) => matchesFilter(a, "waiting"))).toEqual([waiting]);
-    expect([waiting, failed, ok].filter((a) => matchesFilter(a, "errors"))).toEqual([failed]);
-    expect([waiting, failed, ok].filter((a) => matchesFilter(a, "review"))).toEqual([ok]);
+    const attention = makeApplication({ report: makeReport({ status: "ATTENTION" }) });
+    const ok = makeApplication({
+      report: makeReport({ status: "PASSED" }),
+      decision: { decision: "ACCEPTED", decidedAt: "2026-10-10T10:00:00Z" },
+    });
+    const all = [waiting, failed, attention, ok];
+    expect(all.filter((a) => matchesFilter(a, "waiting"))).toEqual([waiting]);
+    expect(all.filter((a) => matchesFilter(a, "errors"))).toEqual([failed]);
+    expect(all.filter((a) => matchesFilter(a, "attention"))).toEqual([attention]);
+    expect(all.filter((a) => matchesFilter(a, "passed"))).toEqual([ok]);
+    expect(all.filter((a) => matchesFilter(a, "decided"))).toEqual([ok]);
     expect(matchesSearch(waiting, "ромаш")).toBe(true);
     expect(matchesSearch(waiting, "6161")).toBe(true);
     expect(matchesSearch(waiting, "альфа")).toBe(false);

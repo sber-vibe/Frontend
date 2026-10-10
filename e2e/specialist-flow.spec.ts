@@ -65,13 +65,13 @@ test("специалист проходит полный сценарий про
   await page.getByTestId("file-input").setInputFiles([
     { name: "1.pdf", mimeType: "application/pdf", buffer: makePdf("Zayavlenie INN 6161234567 summa 850000") },
     { name: "scan4.png", mimeType: "image/png", buffer: PNG },
-    { name: "qwe.txt", mimeType: "text/plain", buffer: Buffer.from("Выписка ЕГРЮЛ. ИНН 6161234567", "utf8") },
+    { name: "qwe.pdf", mimeType: "application/pdf", buffer: makePdf("Vypiska EGRUL INN 6161234567") },
     { name: "virus.exe", mimeType: "application/octet-stream", buffer: Buffer.from("x") },
   ]);
   await expect(page.getByText(/Формат не поддерживается/)).toBeVisible();
   await page.getByLabel("Тип документа для 1.pdf").selectOption("APPLICATION");
   await page.getByLabel("Тип документа для scan4.png").selectOption("COST_ESTIMATE");
-  await page.getByLabel("Тип документа для qwe.txt").selectOption("SUPPORTING_DOCUMENT");
+  await page.getByLabel("Тип документа для qwe.pdf").selectOption("SUPPORTING_DOCUMENT");
   await shot(page, "03-upload-queue");
   await page.getByRole("button", { name: "Загрузить (3)" }).click();
   const list = page.getByRole("navigation", { name: "Документы пакета" });
@@ -87,8 +87,8 @@ test("специалист проходит полный сценарий про
   // 5. Серверная проверка: не хватает выписки
   await page.getByRole("button", { name: "Запустить проверку" }).click();
   await expect(page).toHaveURL(/\/result$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Требует доработки" })).toBeVisible();
-  await expect(page.getByText("Отсутствует: Выписка из ЕГРЮЛ/ЕГРИП")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Есть ошибки" })).toBeVisible();
+  await expect(page.getByText(/Не хватает: Выписка из ЕГРЮЛ\/ЕГРИП/)).toBeVisible();
   await shot(page, "05-result-incomplete");
 
   // 6. Протокол проверки
@@ -98,7 +98,7 @@ test("специалист проходит полный сценарий про
 
   // 7. Исправление типа: доп. документ на самом деле — выписка ЕГРЮЛ
   await page.getByRole("link", { name: "Дозагрузить документы" }).click();
-  await list.getByText("qwe.txt").click();
+  await list.getByText("qwe.pdf").click();
   if (test.info().project.name === "mobile") await page.getByRole("tab", { name: "Разбор" }).click();
   await page.getByRole("button", { name: "Исправить тип" }).click();
   await page.getByLabel("Новый тип документа").selectOption("REGISTRATION_EXTRACT");
@@ -108,7 +108,7 @@ test("специалист проходит полный сценарий про
 
   // 8. Повторная проверка — пакет полный
   await page.getByRole("button", { name: "Запустить проверку" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Готов к экспертизе" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Требует внимания" })).toBeVisible();
   await expect(page.getByText("Все обязательные документы на месте")).toBeVisible();
   await shot(page, "06-result-complete");
 

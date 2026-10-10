@@ -19,10 +19,10 @@ describe("ChecksDashboard", () => {
     renderWithProviders(<ChecksDashboard />);
     const romashka = (await screen.findByText("ООО Ромашка")).closest("a")!;
     expect(romashka).toHaveAttribute("href", "/checks/a1");
-    expect(within(romashka).getByText("Требует доработки")).toBeInTheDocument();
+    expect(within(romashka).getByText("Есть ошибки", { selector: "span" })).toBeInTheDocument();
     expect(within(romashka).getByText(/1 документ/)).toBeInTheDocument();
     expect(within(romashka).getByTitle("Критические ошибки")).toHaveTextContent("1");
-    expect(screen.getByText("Готов к экспертизе")).toBeInTheDocument();
+    expect(screen.getByText("Требует внимания", { selector: "span" })).toBeInTheDocument();
     expect(screen.getByText("Ожидает документы")).toBeInTheDocument();
     expect(screen.getByText(/Анна/)).toBeInTheDocument();
   });
