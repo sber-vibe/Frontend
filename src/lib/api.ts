@@ -2,10 +2,14 @@ import type {
   ApplicationView,
   CheckReport,
   CreateApplication,
+  DecisionRequest,
   DocumentPatch,
   DocumentTypeCode,
   DocumentView,
+  JournalEntry,
   ProblemDetail,
+  Program,
+  Rule,
 } from "./types";
 
 const BASE = "/api/v1";
@@ -37,6 +41,10 @@ const DETAIL_TRANSLATIONS: Record<string, string> = {
   "Unable to read uploaded file": "Не удалось прочитать загруженный файл",
   "Invalid request content.": "Проверьте правильность заполнения полей",
   "Maximum upload size exceeded": "Файл больше 10 МБ",
+  "Program not found": "Программа субсидии не найдена",
+  "Rule not found": "Правило не найдено",
+  "Model unavailable": "Модель недоступна, попробуйте повторить позже",
+  "Document is being processed": "Документ ещё обрабатывается",
 };
 
 export class ApiError extends Error {
@@ -50,8 +58,16 @@ export class ApiError extends Error {
     this.problem = problem;
   }
 
+  /**
+   * Сервер не знает этот метод или маршрут (функция ещё не реализована на backend).
+   * 404 считается «не реализовано», только если это не ответ бизнес-логики о ненайденной сущности:
+   * Spring отдаёт «No static resource …», прокси — 404 без Problem Details.
+   */
   get isUnsupported(): boolean {
-    return this.status === 405 || this.status === 501;
+    if (this.status === 405 || this.status === 501) return true;
+    if (this.status !== 404) return false;
+    const detail = this.problem?.detail ?? "";
+    return !this.problem || detail.startsWith("No static resource") || detail.startsWith("No endpoint");
   }
 }
 
@@ -98,6 +114,13 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await request(path, init);
   return (await response.json()) as T;
 }
+
+function sendJson<T>(path: string, method: "POST" | "PUT" | "PATCH", body: unknown): Promise<T> {
+  return json<T>(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+}
+
+const app = (id: string) => `/applications/${encodeURIComponent(id)}`;
+const doc = (id: string, documentId: string) => `${app(id)}/documents/${encodeURIComponent(documentId)}`;
 
 export const api = {
   documentTypes: () => json<DocumentTypeCode[]>("/document-types"),
@@ -151,4 +174,27 @@ export const api = {
 
   runCheck: (applicationId: string) =>
     json<CheckReport>(`/applications/${encodeURIComponent(applicationId)}/check`, { method: "POST" }),
+
+  /** Повторить обработку файла моделью после ошибки (модель была недоступна, таймаут). */
+  reprocessDocument: (applicationId: string, documentId: string) =>
+    json<DocumentView>(`${doc(applicationId, documentId)}/reprocess`, { method: "POST" }),
+
+  /** Решение специалиста по заявке: принять, вернуть на доработку, отклонить. */
+  decide: (applicationId: string, body: DecisionRequest) =>
+    sendJson<ApplicationView>(`${app(applicationId)}/decision`, "POST", body),
+
+  applicationJournal: (applicationId: string) => json<JournalEntry[]>(`${app(applicationId)}/journal`),
+
+  /** Программы субсидий с перечнями документов — для выбора при создании заявки. */
+  programs: () => json<Program[]>("/programs"),
+
+  admin: {
+    programs: () => json<Program[]>("/admin/programs"),
+    createProgram: (program: Program) => sendJson<Program>("/admin/programs", "POST", program),
+    saveProgram: (program: Program) =>
+      sendJson<Program>(`/admin/programs/${encodeURIComponent(program.code)}`, "PUT", program),
+    rules: () => json<Rule[]>("/admin/rules"),
+    saveRule: (rule: Rule) => sendJson<Rule>(`/admin/rules/${encodeURIComponent(rule.code)}`, "PUT", rule),
+    journal: (limit = 200) => json<JournalEntry[]>(`/admin/journal?limit=${limit}`),
+  },
 };

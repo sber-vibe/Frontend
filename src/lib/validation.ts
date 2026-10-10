@@ -12,6 +12,8 @@ export interface CreateCheckValues {
   inn: string;
   projectName: string;
   requestedAmount: string;
+  /** Пусто — программу определит сервер из заявления. */
+  programCode: string;
 }
 
 export type CreateCheckErrors = Partial<Record<keyof CreateCheckValues, string>>;
@@ -52,12 +54,13 @@ export function toCreateApplication(values: CreateCheckValues): CreateApplicatio
     inn: values.inn.trim(),
     projectName: values.projectName.trim(),
     requestedAmount: parseAmount(values.requestedAmount),
+    programCode: values.programCode || null,
   };
 }
 
 export function validateFile(file: File): string | null {
   if (!config.acceptedExtensions.includes(fileExtension(file.name))) {
-    return "Формат не поддерживается. Допустимы PDF, DOCX, TXT, PNG, JPG";
+    return `Формат не поддерживается. Допустимы ${config.acceptedFormatsLabel}`;
   }
   if (file.size === 0) return "Файл пустой";
   if (file.size > config.maxFileSize) return "Файл больше 10 МБ";
