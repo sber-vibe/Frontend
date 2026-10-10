@@ -73,7 +73,7 @@ describe("CreateCheckForm", () => {
     await userEvent.click(screen.getByRole("button", { name: /Создать/ }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(created));
     expect(onSubmit).toHaveBeenCalledWith({
-      applicantName: "ООО Ромашка",
+      applicantName: "ООО Какие люди",
       inn: "6161234567",
       projectName: "Цифровая платформа",
       requestedAmount: 850000.5,
