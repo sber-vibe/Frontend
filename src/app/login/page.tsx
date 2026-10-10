@@ -70,8 +70,8 @@ function LoginContent() {
           <p className={s.subtitle}>Рабочее место проверки заявок на субсидию</p>
           <LoginForm
             oidcEnabled={oidcEnabled}
-            onDemoLogin={(name) => {
-              loginDemo(name);
+            onDemoLogin={(name, role) => {
+              loginDemo(name, role);
               router.replace(returnTo);
             }}
             onOidcLogin={() => loginOidc(returnTo)}

@@ -5,19 +5,35 @@ import type { ReactNode } from "react";
 import { setTokenProvider } from "./api";
 import { buildAuthorizeUrl, decodeJwt, getOidcConfig, logoutUrl, type TokenSet } from "./oidc";
 
+export type Role = "specialist" | "admin";
+
 export interface Session {
   name: string;
   mode: "oidc" | "demo";
+  /** Роли пользователя: из realm_access.roles токена Keycloak или выбранная при демо-входе. */
+  roles?: Role[];
   accessToken?: string;
   idToken?: string;
   expiresAt?: number;
+}
+
+/** Роли из access token Keycloak. Только для показа интерфейса — доступ проверяет backend. */
+export function rolesFromClaims(claims: Record<string, unknown>): Role[] {
+  const realm = claims.realm_access as { roles?: unknown } | undefined;
+  const roles = Array.isArray(realm?.roles) ? (realm.roles as unknown[]) : [];
+  return (["specialist", "admin"] as const).filter((r) => roles.includes(r));
+}
+
+export function hasRole(session: Session | null, role: Role): boolean {
+  // старые сессии без ролей — специалист
+  return (session?.roles ?? ["specialist"]).includes(role);
 }
 
 interface AuthApi {
   session: Session | null;
   ready: boolean;
   oidcEnabled: boolean;
-  loginDemo: (name: string) => void;
+  loginDemo: (name: string, role?: Role) => void;
   loginOidc: (returnTo?: string) => Promise<void>;
   completeOidc: (tokens: TokenSet) => void;
   logout: () => void;
@@ -71,7 +87,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       ready,
       oidcEnabled: oidc !== null,
-      loginDemo: (name) => update({ name: name.trim(), mode: "demo" }),
+      loginDemo: (name, role = "specialist") =>
+        update({ name: name.trim(), mode: "demo", roles: role === "admin" ? ["specialist", "admin"] : ["specialist"] }),
       loginOidc: async (returnTo) => {
         if (!oidc) return;
         window.location.assign(await buildAuthorizeUrl(oidc, returnTo));
@@ -79,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       completeOidc: (tokens) => {
         const claims = decodeJwt(tokens.idToken ?? tokens.accessToken);
         const name = String(claims.name ?? claims.preferred_username ?? "Специалист");
-        update({ name, mode: "oidc", ...tokens });
+        update({ name, mode: "oidc", roles: rolesFromClaims(decodeJwt(tokens.accessToken)), ...tokens });
       },
       logout: () => {
         const idToken = session?.idToken;

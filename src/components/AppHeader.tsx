@@ -12,6 +12,8 @@ const NAV = [
   { href: "/checks/new", label: "Новая проверка", exact: true },
 ];
 
+const ADMIN_NAV = { href: "/admin", label: "Администрирование", exact: false };
+
 function initials(name: string): string {
   return name
     .split(/\s+/)
@@ -21,8 +23,9 @@ function initials(name: string): string {
     .join("");
 }
 
-export function AppHeader({ userName, onLogout }: { userName: string; onLogout: () => void }) {
+export function AppHeader({ userName, isAdmin, onLogout }: { userName: string; isAdmin?: boolean; onLogout: () => void }) {
   const pathname = usePathname();
+  const nav = isAdmin ? [...NAV, ADMIN_NAV] : NAV;
 
   return (
     <header className={`${s.header} no-print`}>
@@ -32,8 +35,8 @@ export function AppHeader({ userName, onLogout }: { userName: string; onLogout: 
         </Link>
 
         <nav className={s.nav} aria-label="Основная навигация">
-          {NAV.map((item) => {
-            const active = pathname === item.href;
+          {nav.map((item) => {
+            const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
             return (
               <Link key={item.href} href={item.href} className={s.navLink} aria-current={active ? "page" : undefined}>
                 {active && <motion.span layoutId="nav-pill" className={s.pill} transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
@@ -47,7 +50,10 @@ export function AppHeader({ userName, onLogout }: { userName: string; onLogout: 
           <ButtonLink href="/checks/new" size="sm" icon="plus" className={s.mobileNew} iconOnly aria-label="Новая проверка" />
           <div className={s.user} title={userName}>
             <span className={s.avatar}>{initials(userName) || "С"}</span>
-            <span className={s.userName}>{userName}</span>
+            <span className={s.userName}>
+              {userName}
+              <small className={s.userRole}>{isAdmin ? "Администратор" : "Специалист"}</small>
+            </span>
           </div>
           <Button variant="ghost" size="sm" icon="logout" iconOnly onClick={onLogout} aria-label="Выйти" title="Выйти" />
         </div>

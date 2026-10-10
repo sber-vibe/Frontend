@@ -2,16 +2,18 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Button, Icon, TextField } from "@/components/ui";
+import type { Role } from "@/lib/auth";
+import { Button, Icon, SelectField, TextField } from "@/components/ui";
 
 interface LoginFormProps {
   oidcEnabled: boolean;
-  onDemoLogin: (name: string) => void;
+  onDemoLogin: (name: string, role: Role) => void;
   onOidcLogin: () => Promise<void> | void;
 }
 
 export function LoginForm({ oidcEnabled, onDemoLogin, onOidcLogin }: LoginFormProps) {
   const [name, setName] = useState("");
+  const [role, setRole] = useState<Role>("specialist");
   const [error, setError] = useState<string>();
   const [redirecting, setRedirecting] = useState(false);
 
@@ -23,7 +25,7 @@ export function LoginForm({ oidcEnabled, onDemoLogin, onOidcLogin }: LoginFormPr
       return;
     }
     setError(undefined);
-    onDemoLogin(value);
+    onDemoLogin(value, role);
   };
 
   if (oidcEnabled) {
@@ -63,6 +65,17 @@ export function LoginForm({ oidcEnabled, onDemoLogin, onOidcLogin }: LoginFormPr
         }}
         autoFocus
       />
+      <div style={{ marginTop: 16 }}>
+        <SelectField
+          label="Роль"
+          value={role}
+          onChange={(e) => setRole(e.target.value as Role)}
+          options={[
+            { value: "specialist", label: "Специалист министерства" },
+            { value: "admin", label: "Администратор (программы и правила)" },
+          ]}
+        />
+      </div>
       <div style={{ marginTop: 20 }}>
         <Button type="submit" size="lg" block iconRight="arrowRight">
           Войти

@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Spinner } from "@/components/ui";
-import { useAuth } from "@/lib/auth";
+import { hasRole, useAuth } from "@/lib/auth";
 
 export default function WorkspaceLayout({ children }: { children: ReactNode }) {
   const { session, ready, logout } = useAuth();
@@ -28,6 +28,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
     <>
       <AppHeader
         userName={session.name}
+        isAdmin={hasRole(session, "admin")}
         onLogout={() => {
           logout();
           router.replace("/login");
