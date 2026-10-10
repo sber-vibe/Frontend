@@ -2,22 +2,30 @@
 
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { CreateCheckForm } from "@/components/checks/CreateCheckForm";
 import { BackLink } from "@/components/BackLink";
 import { Icon } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api";
+import type { Program } from "@/lib/types";
 import s from "./new.module.scss";
 
 const STEPS = [
-  { title: "Данные организации", text: "Название, ИНН и сумма субсидии" },
-  { title: "Загрузка пакета", text: "PDF, сканы и фото документов" },
-  { title: "Автоматическая проверка", text: "Комплектность, суммы, сверка ИНН" },
+  { title: "Заявка и программа", text: "Организация, ИНН, сумма и программа субсидии" },
+  { title: "Загрузка пакета", text: "PDF, DOC/DOCX, XLS/XLSX, сканы и фото — сразу несколько файлов" },
+  { title: "Проверка в фоне", text: "Тип по содержимому, комплектность, сроки, ИНН, доля собственных средств" },
 ];
 
 export default function NewCheckPage() {
   const router = useRouter();
   const toast = useToast();
+  const [programs, setPrograms] = useState<Program[] | null | undefined>(undefined);
+
+  useEffect(() => {
+    // перечень программ необязателен: без него программу определяет сервер из заявления
+    api.programs().then(setPrograms, () => setPrograms(null));
+  }, []);
 
   return (
     <div className={s.page}>
@@ -32,6 +40,7 @@ export default function NewCheckPage() {
           <h1>Новая проверка</h1>
           <p className={s.lead}>Укажите данные организации, которая претендует на субсидию.</p>
           <CreateCheckForm
+            programs={programs}
             onSubmit={api.createApplication}
             onCreated={(app) => {
               toast.success("Проверка создана", "Теперь загрузите пакет документов");

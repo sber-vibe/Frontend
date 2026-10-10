@@ -8,6 +8,7 @@ import { DASHBOARD_FILTERS, matchesFilter, matchesSearch, type DashboardFilter }
 import { useAsync } from "@/lib/useAsync";
 import { ButtonLink, EmptyState, ErrorState, Icon, Skeleton } from "@/components/ui";
 import { CheckCard } from "./CheckCard";
+import { Insights } from "./Insights";
 import s from "./checks.module.scss";
 
 function greeting(date = new Date()): string {
@@ -45,7 +46,7 @@ export function ChecksDashboard() {
             {session ? `, ${session.name.split(" ")[0]}` : ""}
           </p>
           <h1>Проверки пакетов документов</h1>
-          <p className={s.heroSub}>Загрузите документы организации — сервер определит их тип, извлечёт данные и проверит правила.</p>
+          <p className={s.heroSub}>Загрузите пакет документов — сервер сам определит, что в каждом файле, проверит комплектность и правила. Вы проверяете результат, а не документы.</p>
         </div>
         <ButtonLink href="/checks/new" icon="plus" size="lg" variant="secondary" className={s.heroButton}>
           Новая проверка
@@ -73,12 +74,14 @@ export function ChecksDashboard() {
         ))}
       </section>
 
+      {data && <Insights apps={apps} />}
+
       <div className={s.toolbar}>
         <div className={s.search}>
           <Icon name="search" size={18} />
           <input
             type="search"
-            placeholder="Организация, ИНН или проект"
+            placeholder="Организация, ИНН, проект или программа"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             aria-label="Поиск проверок"

@@ -1,0 +1,56 @@
+@use "tokens" as *;
+
+// общая раскладка служебных страниц: журнал, история организации, администрирование
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+
+  h1 {
+    font-size: clamp(22px, 3.5vw, 30px);
+  }
+
+  p {
+    margin: 4px 0 0;
+    color: var(--text-2);
+  }
+}
+
+.card {
+  @include card;
+  padding: 20px;
+
+  @include up(md) {
+    padding: 24px 28px;
+  }
+
+  h2 {
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+}
+
+.notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--info-50);
+  color: #05608f;
+  font-weight: 500;
+
+  svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+}
