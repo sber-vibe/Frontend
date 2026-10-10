@@ -2,6 +2,9 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
+// В тестах компонентов вход выполняется демо-сессией с заданными ролями.
+process.env.NEXT_PUBLIC_DEMO_LOGIN = "true";
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();

@@ -87,7 +87,8 @@ export interface Finding {
 }
 
 /** Строка комплектности, посчитанная сервером по перечню программы. */
-export type CompletenessStatus = "FOUND" | "MISSING" | "CONDITIONAL_MISSING" | "EXTRA";
+/** CONDITIONAL_UNKNOWN — условный документ, но признак проекта, от которого он зависит, не указан. */
+export type CompletenessStatus = "FOUND" | "MISSING" | "CONDITIONAL_MISSING" | "CONDITIONAL_UNKNOWN" | "EXTRA";
 
 export interface CompletenessItem {
   type: DocumentTypeCode;
@@ -97,6 +98,8 @@ export interface CompletenessItem {
   documentIds?: string[];
   /** Условие для условного документа, например «если проект подлежит сертификации». */
   condition?: string | null;
+  /** Код признака проекта, от которого зависит условный документ. */
+  conditionAttribute?: string | null;
   /** Можно ли дослать документ в эту заявку. */
   canUpload?: boolean;
 }
@@ -146,12 +149,25 @@ export interface ApplicationView {
    * Значения верхнего уровня (applicantName, inn, …) — те же, но без источника и статуса.
    */
   requisites?: ApplicationRequisite[];
+  /** Признаки проекта для условных документов: true/false — указано, null или нет ключа — неизвестно. */
+  attributes?: Record<string, boolean | null>;
+}
+
+/** Признак проекта, от которого зависит условный документ программы (например, «нужна сертификация»). */
+export interface ApplicationAttribute {
+  code: string;
+  name: string;
+  description?: string | null;
 }
 
 /** Заявка создаётся пустой: реквизиты сервер извлечёт из загруженного пакета. */
 export interface CreateApplication {
   /** null — программу определит сервер из заявления. */
   programCode: string | null;
+}
+
+export interface ApplicationPatch {
+  attributes: Record<string, boolean | null>;
 }
 
 export interface DocumentPatch {
@@ -169,8 +185,10 @@ export interface DecisionRequest {
 export interface ProgramDocument {
   type: DocumentTypeCode;
   requirement: "REQUIRED" | "CONDITIONAL";
-  /** Для условного документа — когда он нужен. */
+  /** Для условного документа — пояснение, когда он нужен. */
   condition?: string | null;
+  /** Для условного документа — код признака проекта: документ нужен, когда признак равен true. */
+  conditionAttribute?: string | null;
 }
 
 export interface Program {
@@ -179,9 +197,29 @@ export interface Program {
   description?: string | null;
   active?: boolean;
   documents: ProgramDocument[];
+  /** Версия для защиты от одновременной перезаписи: сервер отвечает 409, если она устарела. */
+  version?: number | null;
+  updatedBy?: string | null;
+  updatedAt?: string | null;
 }
 
-export type RuleParamValue = string | number | boolean;
+export type RuleParamValue = string | number | boolean | number[] | null;
+
+/**
+ * Описание параметра правила с сервера. percent — UI принимает проценты (50), API хранит долю (0.5);
+ * money — рубли; integer — целое (например, дни); list — список целых через запятую (длины ИНН).
+ */
+export interface RuleParamSchema {
+  kind: "percent" | "number" | "integer" | "money" | "text" | "boolean" | "list";
+  label?: string;
+  hint?: string | null;
+  unit?: string | null;
+  /** Границы в единицах интерфейса (для percent — проценты). */
+  min?: number | null;
+  max?: number | null;
+  /** По умолчанию параметр обязателен. */
+  required?: boolean;
+}
 
 export interface Rule {
   code: string;
@@ -193,6 +231,11 @@ export interface Rule {
   documentTypes?: DocumentTypeCode[];
   /** Настраиваемые параметры: порог, поле, срок и т.п. */
   params?: Record<string, RuleParamValue>;
+  /** Схема параметров с сервера; без неё интерфейс использует встроенные описания известных параметров. */
+  paramSchema?: Record<string, RuleParamSchema>;
+  version?: number | null;
+  updatedBy?: string | null;
+  updatedAt?: string | null;
 }
 
 /* ---------- Журнал ---------- */
@@ -210,6 +253,20 @@ export interface JournalEntry {
   outcome?: "OK" | "FAILED" | string;
   /** Причина отказа или ошибки. */
   reason?: string | null;
+  /** Для изменения настроек: прежнее и новое значение, версия настроек после изменения. */
+  before?: unknown;
+  after?: unknown;
+  version?: number | null;
+  /** Затронутый объект: программа, правило, заявка, пользователь. */
+  objectType?: "PROGRAM" | "RULE" | "APPLICATION" | "USER" | string | null;
+  objectId?: string | null;
+}
+
+export interface JournalQuery {
+  /** Записи строго раньше этого момента (ISO) — для загрузки следующей страницы. */
+  before?: string;
+  action?: string;
+  limit?: number;
 }
 
 /** RFC 9457 Problem Details */

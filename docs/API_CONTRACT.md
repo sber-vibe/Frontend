@@ -163,21 +163,31 @@
   { "type": "PD_CONSENT", "status": "MISSING", "requirement": "REQUIRED", "canUpload": true },
   { "type": "CONFORMITY_CERTIFICATE", "status": "CONDITIONAL_MISSING", "requirement": "CONDITIONAL",
     "condition": "если продукция подлежит сертификации" },
-  { "type": "GIMS_DECLARATION", "status": "EXTRA", "requirement": "EXTRA", "documentIds": ["d7"] } ]
+  { "type": "GIMS_DECLARATION", "status": "CONDITIONAL_UNKNOWN", "requirement": "CONDITIONAL",
+    "conditionAttribute": "usesWaterArea", "condition": "если используется акватория" },
+  { "type": "BANK_STATEMENT", "status": "EXTRA", "requirement": "EXTRA", "documentIds": ["d7"] } ]
 ```
+
+`CONDITIONAL_UNKNOWN` — признак проекта, от которого зависит условный документ, не указан: применимость не определена.
+Фронт показывает это отдельно и предлагает указать признак, а не считает документ ненужным.
 
 Без `completeness` фронт строит список из `GET /document-types` и замечаний `MISSING_DOCUMENT` /
 `CONDITIONAL_DOCUMENT_MISSING`.
 
 ## Журнал
 
-`GET /applications/{id}/journal` и `GET /admin/journal?limit=200` → `JournalEntry[]`:
+`GET /applications/{id}/journal` и `GET /admin/journal?limit=50[&before=<ISO>][&action=<код>]` → `JournalEntry[]`
+(новые сверху; `before` — записи строго раньше момента, для подгрузки «Показать более ранние»):
 
 ```json
 { "id": "…", "at": "2026-10-10T09:02:00Z", "actor": "gigachat", "actorType": "SYSTEM",
   "action": "PROCESSING_FAILED", "message": "7.pdf не обработан", "outcome": "FAILED",
   "reason": "Модель не ответила за 60 секунд", "applicationId": "…", "documentId": "…" }
 ```
+
+Для изменения настроек дополнительно: `before`, `after` (прежнее и новое значение — объект или скаляр; фронт
+показывает только различающиеся поля), `version` (версия настроек после изменения), `objectType`
+(`PROGRAM` / `RULE` / `APPLICATION` / `USER`), `objectId`.
 
 `actorType`: `SYSTEM` / `SPECIALIST` / `ADMIN`. Подписи действий — `src/components/journal/JournalList.tsx`
 (`APPLICATION_CREATED`, `DOCUMENT_UPLOADED`, `DOCUMENT_CLASSIFIED`, `FIELDS_EXTRACTED`, `DOCUMENT_TYPE_CHANGED`,
@@ -193,14 +203,40 @@
 | PUT | `/admin/programs/{code}` | `Program` → сохранённая `Program` |
 | GET | `/admin/rules` | `Rule[]` |
 | PUT | `/admin/rules/{code}` | `Rule` → сохранённое `Rule` |
+| GET | `/document-types` | справочник видов, которые сервер распознаёт; других видов в перечне программы фронт не предлагает |
+| GET | `/application-attributes` | `ApplicationAttribute[]` — признаки проекта для условных документов |
+
+`Program` и `Rule` несут `version`, `updatedBy`, `updatedAt`. PUT с устаревшей `version` → `409`
+(фронт: «Настройку уже изменил другой администратор»). Нет роли `admin` → `403`.
+
+Условный документ программы:
+
+```json
+{ "type": "CONFORMITY_CERTIFICATE", "requirement": "CONDITIONAL",
+  "condition": "если продукция подлежит сертификации", "conditionAttribute": "requiresCertification" }
+```
+
+Правило:
 
 ```json
 { "code": "OWN_FUNDS_SHARE", "name": "Доля собственных средств", "enabled": true, "severity": "ERROR",
-  "documentTypes": ["COST_JUSTIFICATION"], "params": { "minOwnFundsShare": 0.5 } }
+  "documentTypes": ["COST_JUSTIFICATION"], "params": { "minOwnFundsShare": 0.5 },
+  "paramSchema": { "minOwnFundsShare": { "kind": "percent", "label": "Минимальная доля собственных средств",
+                                          "unit": "%", "min": 0, "max": 100 } },
+  "version": 3, "updatedBy": "Иван Админ", "updatedAt": "2026-10-10T09:00:00Z" }
 ```
 
-`params` — произвольные пары ключ/значение (число, строка, булево). Фронт рисует поле по типу значения;
-русские подписи известных ключей — `PARAM_LABELS` в `src/components/admin/RulesEditor.tsx`.
+`paramSchema[key].kind`: `percent` (в интерфейсе проценты 0–100, в API доля 0–1), `number`, `integer`, `money`,
+`text`, `boolean`, `list` (целые через запятую). `min`/`max` — в единицах интерфейса. Без `paramSchema` фронт
+использует встроенные описания известных ключей (`src/lib/ruleParams.ts`). Пустое значение не сохраняется и не
+превращается в 0.
+
+## Признаки проекта в заявке
+
+`ApplicationView.attributes`: `{ "requiresCertification": true, "usesWaterArea": null }` — `null`/нет ключа = неизвестно.
+
+`PATCH /applications/{id}` `{ "attributes": { "requiresCertification": true } }` → `ApplicationView`;
+отчёт сбрасывается, комплектность пересчитывается.
 
 ## Программы
 
@@ -211,6 +247,8 @@
 
 Фронт отправляет `Authorization: Bearer <access token>` Keycloak. Роли берутся из `realm_access.roles`
 (`specialist`, `admin`) **только для показа интерфейса**: доступ к API и к файлам проверяет backend.
+Отказ по умолчанию: без ролей рабочие экраны не открываются; заявки — только `specialist`, настройки — только `admin`.
+Без Keycloak входа нет; демо-вход с выбором роли включается только для разработки (`NEXT_PUBLIC_DEMO_LOGIN=true`).
 
 На любой `401` фронт завершает сессию Keycloak и отправляет на вход с возвратом на ту же страницу
 («Сессия истекла… последнее действие не было выполнено»). Опрос заявки при `401`/`403` прекращается,

@@ -20,6 +20,7 @@ import { useToast } from "@/components/ui/Toast";
 import { DocumentDetails } from "./DocumentDetails";
 import { DocumentList } from "./DocumentList";
 import { DocumentViewer } from "./DocumentViewer";
+import { AttributesPanel } from "./AttributesPanel";
 import { RequisitesPanel } from "./RequisitesPanel";
 import { UploadPanel } from "./UploadPanel";
 import s from "./package.module.scss";
@@ -297,6 +298,8 @@ export function PackageWorkspace({ id }: { id: string }) {
           }}
         />
       )}
+
+      {app.programCode && <AttributesPanel app={app} onUpdated={(fresh) => setApp(() => fresh)} />}
 
       {docsCount === 0 ? (
         <EmptyState

@@ -1,4 +1,7 @@
 import type {
+  ApplicationAttribute,
+  ApplicationPatch,
+  JournalQuery,
   ApplicationView,
   CheckReport,
   CreateApplication,
@@ -11,6 +14,9 @@ import type {
   Program,
   Rule,
 } from "./types";
+
+/** Сколько записей общего журнала загружать за раз. */
+export const JOURNAL_PAGE = 50;
 
 const BASE = "/api/v1";
 
@@ -217,6 +223,13 @@ export const api = {
 
   applicationJournal: (applicationId: string) => json<JournalEntry[]>(`${app(applicationId)}/journal`),
 
+  /** Признаки проекта, от которых зависят условные документы программ. */
+  applicationAttributes: () => json<ApplicationAttribute[]>("/application-attributes"),
+
+  /** Специалист указывает признаки проекта; сервер пересчитывает комплектность и сбрасывает отчёт. */
+  updateApplication: (applicationId: string, patch: ApplicationPatch) =>
+    sendJson<ApplicationView>(app(applicationId), "PATCH", patch),
+
   /** Программы субсидий с перечнями документов — для выбора при создании заявки. */
   programs: () => json<Program[]>("/programs"),
 
@@ -227,6 +240,11 @@ export const api = {
       sendJson<Program>(`/admin/programs/${encodeURIComponent(program.code)}`, "PUT", program),
     rules: () => json<Rule[]>("/admin/rules"),
     saveRule: (rule: Rule) => sendJson<Rule>(`/admin/rules/${encodeURIComponent(rule.code)}`, "PUT", rule),
-    journal: (limit = 200) => json<JournalEntry[]>(`/admin/journal?limit=${limit}`),
+    journal: ({ before, action, limit = JOURNAL_PAGE }: JournalQuery = {}) => {
+      const query = new URLSearchParams({ limit: String(limit) });
+      if (before) query.set("before", before);
+      if (action) query.set("action", action);
+      return json<JournalEntry[]>(`/admin/journal?${query}`);
+    },
   },
 };

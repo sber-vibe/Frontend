@@ -31,6 +31,36 @@ const ACTION_LABEL: Record<string, string> = {
   ACCESS_DENIED: "Отказ в доступе",
 };
 
+const OBJECT_LABEL: Record<string, string> = {
+  PROGRAM: "Программа",
+  RULE: "Правило",
+  APPLICATION: "Заявка",
+  USER: "Пользователь",
+};
+
+/** Значение настройки до/после изменения — коротко и читаемо. */
+export function formatChangeValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "boolean") return value ? "да" : "нет";
+  if (typeof value === "number" || typeof value === "string") return String(value);
+  if (Array.isArray(value)) return value.map(formatChangeValue).join(", ");
+  return Object.entries(value as Record<string, unknown>)
+    .map(([k, v]) => `${k}: ${formatChangeValue(v)}`)
+    .join("; ");
+}
+
+/** Поля, которые различаются между прежним и новым значением; для простых значений — одна строка. */
+export function changedFields(before: unknown, after: unknown): { field: string | null; before: string; after: string }[] {
+  const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+  if (isObject(before) && isObject(after)) {
+    const keys = Array.from(new Set([...Object.keys(before), ...Object.keys(after)]));
+    return keys
+      .filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]))
+      .map((k) => ({ field: k, before: formatChangeValue(before[k]), after: formatChangeValue(after[k]) }));
+  }
+  return [{ field: null, before: formatChangeValue(before), after: formatChangeValue(after) }];
+}
+
 export function actionLabel(action: string): string {
   return ACTION_LABEL[action] ?? action.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase());
 }
@@ -70,8 +100,20 @@ export function JournalList({ entries, showApplication }: Props) {
               </div>
               <p className={s.message}>{e.message}</p>
               {e.reason && <p className={s.reason}>Причина: {e.reason}</p>}
+              {(e.before !== undefined || e.after !== undefined) && (
+                <ul className={s.changes} aria-label="Изменения">
+                  {changedFields(e.before, e.after).map((c) => (
+                    <li key={c.field ?? "value"}>
+                      {c.field && <span className={s.changeField}>{c.field}: </span>}
+                      <span className={s.before}>{c.before}</span> → <b>{c.after}</b>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <p className={s.meta}>
                 {actor.label}: {e.actor}
+                {e.objectType && ` · ${OBJECT_LABEL[e.objectType] ?? e.objectType}${e.objectId ? ` ${e.objectId}` : ""}`}
+                {e.version != null && ` · версия ${e.version}`}
                 {showApplication && e.applicationId && (
                   <>
                     {" · "}

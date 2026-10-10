@@ -321,6 +321,7 @@ export interface CompletenessRow {
   status: CompletenessItem["status"];
   requirement: NonNullable<CompletenessItem["requirement"]>;
   condition?: string | null;
+  conditionAttribute?: string | null;
   documentIds: string[];
   canUpload: boolean;
 }
@@ -332,6 +333,8 @@ export interface CompletenessView {
   total: number;
   missing: string[];
   conditionalMissing: string[];
+  /** Условные документы, применимость которых не определена: признак проекта не указан. */
+  conditionalUnknown: string[];
   extra: string[];
 }
 
@@ -345,8 +348,9 @@ export function completenessRows(requiredTypes: string[], report: CheckReport): 
     rows = report.completeness.map((c) => ({
       type: c.type,
       status: c.status,
-      requirement: c.requirement ?? (c.status === "EXTRA" ? "EXTRA" : c.status === "CONDITIONAL_MISSING" ? "CONDITIONAL" : "REQUIRED"),
+      requirement: c.requirement ?? (c.status === "EXTRA" ? "EXTRA" : c.status.startsWith("CONDITIONAL_") ? "CONDITIONAL" : "REQUIRED"),
       condition: c.condition,
+      conditionAttribute: c.conditionAttribute,
       documentIds: c.documentIds ?? [],
       canUpload: c.canUpload ?? c.status !== "EXTRA",
     }));
@@ -375,6 +379,7 @@ export function completenessRows(requiredTypes: string[], report: CheckReport): 
     total: required.length,
     missing: rows.filter((r) => r.status === "MISSING").map((r) => r.type),
     conditionalMissing: rows.filter((r) => r.status === "CONDITIONAL_MISSING").map((r) => r.type),
+    conditionalUnknown: rows.filter((r) => r.status === "CONDITIONAL_UNKNOWN").map((r) => r.type),
     extra: rows.filter((r) => r.status === "EXTRA").map((r) => r.type),
   };
 }

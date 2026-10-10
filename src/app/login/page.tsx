@@ -6,7 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { LoginForm } from "@/components/LoginForm";
 import { Logo } from "@/components/Logo";
 import { Icon, type IconName } from "@/components/ui";
-import { takeSessionExpired, useAuth } from "@/lib/auth";
+import { homePath, takeSessionExpired, useAuth } from "@/lib/auth";
 import s from "./login.module.scss";
 
 const FEATURES: { icon: IconName; title: string; text: string }[] = [
@@ -15,12 +15,12 @@ const FEATURES: { icon: IconName; title: string; text: string }[] = [
   { icon: "eye", title: "Оригинал рядом", text: "Сравнивайте файл и результат разбора" },
 ];
 
-function safeReturnTo(raw: string | null): string {
-  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/checks";
+function safeReturnTo(raw: string | null): string | null {
+  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : null;
 }
 
 function LoginContent() {
-  const { session, ready, oidcEnabled, loginDemo, loginOidc } = useAuth();
+  const { session, ready, oidcEnabled, demoEnabled, loginDemo, loginOidc } = useAuth();
   const router = useRouter();
   const returnTo = safeReturnTo(useSearchParams().get("returnTo"));
   const [expired, setExpired] = useState(false);
@@ -28,7 +28,7 @@ function LoginContent() {
   useEffect(() => setExpired(takeSessionExpired()), []);
 
   useEffect(() => {
-    if (ready && session) router.replace(returnTo);
+    if (ready && session) router.replace(returnTo ?? homePath(session));
   }, [ready, session, router, returnTo]);
 
   return (
@@ -79,11 +79,9 @@ function LoginContent() {
           )}
           <LoginForm
             oidcEnabled={oidcEnabled}
-            onDemoLogin={(name, role) => {
-              loginDemo(name, role);
-              router.replace(returnTo);
-            }}
-            onOidcLogin={() => loginOidc(returnTo)}
+            demoEnabled={demoEnabled}
+            onDemoLogin={(name, role) => loginDemo(name, role)}
+            onOidcLogin={() => loginOidc(returnTo ?? undefined)}
           />
         </motion.div>
       </section>

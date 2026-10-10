@@ -9,7 +9,7 @@ Next.js 16 (App Router) · TypeScript · SCSS-модули · framer-motion · V
 
 | Экран | Путь | Что умеет |
 |---|---|---|
-| Вход | `/login` | Keycloak OIDC (Authorization Code + PKCE) или демо-вход с выбором роли, если Keycloak не настроен |
+| Вход | `/login` | Keycloak OIDC (Authorization Code + PKCE). Демо-вход с выбором роли — только при `NEXT_PUBLIC_DEMO_LOGIN=true` |
 | Дашборд | `/checks` | Сводка и фильтры «Ожидают / Есть ошибки / Требуют внимания / Пройдены / Решение принято», поиск, частые замечания по потоку, документы с истекающим сроком |
 | Новая проверка | `/checks/new` | Организация, ИНН, сумма и программа субсидии (или «определить из заявления»), перечень документов программы |
 | Пакет документов | `/checks/:id` | Загрузка нескольких файлов (PDF, DOC/DOCX, XLS/XLSX, JPG/PNG), этапы фоновой обработки по каждому файлу, оригинал рядом с разбором, тип + уверенность + поля с фрагментом источника, правка типа и полей (видна как действие специалиста), повтор обработки после ошибки модели, предупреждение о повторном пакете |
@@ -66,6 +66,7 @@ Next.js проксирует `/api/*` на `BACKEND_URL` (rewrites), поэто�
 | `NEXT_PUBLIC_CONFIDENCE_THRESHOLD` | `0.8` | Ниже этого порога тип помечается как требующий подтверждения |
 | `NEXT_PUBLIC_POLL_INTERVAL_MS` | `2000` | Период опроса сервера, пока документы обрабатываются в фоне |
 | `NEXT_PUBLIC_OIDC_ISSUER`, `NEXT_PUBLIC_OIDC_CLIENT_ID` | пусто | Keycloak realm и public client. Redirect URI: `<origin>/auth/callback` |
+| `NEXT_PUBLIC_DEMO_LOGIN` | `false` | Только для разработки и e2e без Keycloak: вход по имени с выбором роли. Роль не даёт прав на сервере. В сдаваемой сборке — `false` |
 
 ## Контракт API
 
@@ -85,6 +86,7 @@ Next.js проксирует `/api/*` на `BACKEND_URL` (rewrites), поэто�
 npm run typecheck
 npm test            # Vitest + Testing Library: API-клиент, формы, программа, загрузка, фоновая обработка, правка, итог, решение, журнал, админка, протокол
 npm run e2e         # Playwright: полный сценарий специалиста на десктопе и телефоне против живого backend
+                    # (сборка без Keycloak: NEXT_PUBLIC_DEMO_LOGIN=true npm run build)
 ```
 
 E2E ожидает запущенный backend. `PW_CHANNEL=msedge` или `PW_CHANNEL=chrome` использует установленный браузер вместо скачанного Chromium.

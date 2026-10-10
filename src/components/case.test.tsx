@@ -12,6 +12,7 @@ import { rolesFromClaims } from "@/lib/auth";
 import { jsonResponse, makeApplication, makeDocument } from "@/test/fixtures";
 import { mockApi } from "@/test/mockApi";
 import { renderWithProviders } from "@/test/render";
+import { KNOWN_TYPES } from "@/lib/documentTypes";
 import type { Program, Rule } from "@/lib/types";
 
 vi.mock("next/navigation", () => import("@/test/navigation"));
@@ -129,7 +130,7 @@ describe("CreateCheckForm: программа субсидии", () => {
 describe("Администрирование", () => {
   it("меняет перечень документов программы и сохраняет на сервер", async () => {
     const onSave = vi.fn(async (p: Program) => p);
-    render(<ProgramsEditor programs={[INNOVATION]} types={[]} onSave={onSave} />);
+    render(<ProgramsEditor programs={[INNOVATION]} types={KNOWN_TYPES} attributes={null} onSave={onSave} />);
     await userEvent.click(screen.getByRole("button", { name: "Изменить" }));
     await userEvent.selectOptions(screen.getByLabelText("Требование для «Гарантийное письмо»"), "REQUIRED");
     await userEvent.selectOptions(screen.getByLabelText("Требование для «Согласие на обработку персональных данных»"), "NONE");
@@ -141,16 +142,6 @@ describe("Администрирование", () => {
       "CONFORMITY_CERTIFICATE:CONDITIONAL",
       "GUARANTEE_LETTER:REQUIRED",
     ]);
-  });
-
-  it("добавляет новый вид документа в перечень", async () => {
-    const onSave = vi.fn(async (p: Program) => p);
-    render(<ProgramsEditor programs={[INNOVATION]} types={[]} onSave={onSave} />);
-    await userEvent.click(screen.getByRole("button", { name: "Изменить" }));
-    await userEvent.type(screen.getByLabelText("Новый вид документа"), "license");
-    await userEvent.click(screen.getByRole("button", { name: "Добавить в перечень" }));
-    await userEvent.click(screen.getByRole("button", { name: "Сохранить изменения" }));
-    await waitFor(() => expect(onSave.mock.calls[0][0].documents).toContainEqual({ type: "LICENSE", requirement: "REQUIRED", condition: null }));
   });
 
   it("меняет порог правила без правки кода", async () => {
@@ -165,7 +156,7 @@ describe("Администрирование", () => {
     render(<RulesEditor rules={[rule]} onSave={onSave} />);
     const input = screen.getByLabelText("Минимальная доля собственных средств");
     await userEvent.clear(input);
-    await userEvent.type(input, "0.6");
+    await userEvent.type(input, "60");
     await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ params: { minOwnFundsShare: 0.6 } })));
   });
@@ -180,10 +171,11 @@ describe("Администрирование", () => {
     // так Spring отвечает на маршрут, которого ещё нет на backend
     mockApi({
       "GET /document-types": [],
+      "GET /application-attributes": () => new Response("", { status: 404 }),
       "GET /admin/programs": () => jsonResponse({ status: 404, detail: "No static resource api/v1/admin/programs." }, 404),
     });
     renderWithProviders(<AdminPage />, { roles: ["specialist", "admin"] });
-    expect(await screen.findByText(/Сервер пока не поддерживает настройку программ субсидий/)).toBeInTheDocument();
+    expect(await screen.findByText(/Настройка программ субсидий пока недоступна/)).toBeInTheDocument();
   });
 });
 

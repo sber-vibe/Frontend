@@ -10,7 +10,7 @@ import { makeApplication } from "@/test/fixtures";
 describe("LoginForm", () => {
   it("не пускает без имени и показывает ошибку", async () => {
     const onDemoLogin = vi.fn();
-    render(<LoginForm oidcEnabled={false} onDemoLogin={onDemoLogin} onOidcLogin={vi.fn()} />);
+    render(<LoginForm oidcEnabled={false} demoEnabled onDemoLogin={onDemoLogin} onOidcLogin={vi.fn()} />);
     await userEvent.click(screen.getByRole("button", { name: "Войти" }));
     expect(screen.getByRole("alert")).toHaveTextContent(/Введите имя/);
     expect(onDemoLogin).not.toHaveBeenCalled();
@@ -18,7 +18,7 @@ describe("LoginForm", () => {
 
   it("входит в демо-режиме с введённым именем", async () => {
     const onDemoLogin = vi.fn();
-    render(<LoginForm oidcEnabled={false} onDemoLogin={onDemoLogin} onOidcLogin={vi.fn()} />);
+    render(<LoginForm oidcEnabled={false} demoEnabled onDemoLogin={onDemoLogin} onOidcLogin={vi.fn()} />);
     await userEvent.type(screen.getByLabelText("Имя специалиста"), "  Анна Петрова ");
     await userEvent.click(screen.getByRole("button", { name: "Войти" }));
     expect(onDemoLogin).toHaveBeenCalledWith("Анна Петрова", "specialist");
@@ -30,6 +30,13 @@ describe("LoginForm", () => {
     expect(screen.queryByLabelText("Имя специалиста")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Keycloak/ }));
     expect(onOidcLogin).toHaveBeenCalled();
+  });
+
+  it("ADM-07: без Keycloak и без режима разработки входа нет и роль не выбрать", () => {
+    render(<LoginForm oidcEnabled={false} onDemoLogin={vi.fn()} onOidcLogin={vi.fn()} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Вход не настроен");
+    expect(screen.queryByLabelText("Роль")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Войти" })).not.toBeInTheDocument();
   });
 });
 

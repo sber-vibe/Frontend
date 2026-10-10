@@ -97,6 +97,7 @@ const ROW_VIEW: Record<CompletenessRow["status"], { icon: IconName; label: strin
   FOUND: { icon: "success", label: "найден" },
   MISSING: { icon: "error", label: "не хватает" },
   CONDITIONAL_MISSING: { icon: "alert", label: "условно требуется" },
+  CONDITIONAL_UNKNOWN: { icon: "alert", label: "не указан признак проекта — применимость не определена" },
   EXTRA: { icon: "info", label: "лишний для программы" },
 };
 
@@ -123,6 +124,11 @@ function CompletenessList({ rows, appId }: { rows: CompletenessRow[]; appId: str
                 {row.documentIds.length > 1 ? ` · ${row.documentIds.length} файла` : ""}
               </small>
             </span>
+            {row.status === "CONDITIONAL_UNKNOWN" && (
+              <Link className={`${s.uploadLink} no-print`} href={`/checks/${appId}#attributes`}>
+                <Icon name="edit" size={14} /> Указать признак
+              </Link>
+            )}
             {(row.status === "MISSING" || row.status === "CONDITIONAL_MISSING") && row.canUpload && (
               <Link className={`${s.uploadLink} no-print`} href={`/checks/${appId}#upload`}>
                 <Icon name="upload" size={14} /> Дослать
@@ -298,7 +304,13 @@ export function ReportView({ id }: { id: string }) {
               <ProgressRing
                 value={completeness.present}
                 total={completeness.total}
-                tone={completeness.missing.length ? "danger" : completeness.conditionalMissing.length ? "warning" : "success"}
+                tone={
+                  completeness.missing.length
+                    ? "danger"
+                    : completeness.conditionalMissing.length || completeness.conditionalUnknown.length
+                      ? "warning"
+                      : "success"
+                }
                 caption="обязательных"
                 size={110}
               />
@@ -306,8 +318,10 @@ export function ReportView({ id }: { id: string }) {
                 {missingTitles.length
                   ? `Не хватает: ${missingTitles.join(", ")}. Документы можно дослать в эту же заявку.`
                   : completeness.conditionalMissing.length
-                    ? "Обязательные документы на месте, но нет условных — проверьте, нужны ли они для этого проекта."
-                    : "Все обязательные документы на месте"}
+                    ? "Обязательные документы на месте, но нет условных, которые требуются для этого проекта."
+                    : completeness.conditionalUnknown.length
+                      ? "Обязательные документы на месте. Для условных не указан признак проекта — укажите его, чтобы определить, нужны ли они."
+                      : "Все обязательные документы на месте"}
               </p>
             </div>
             <CompletenessList rows={completeness.rows} appId={id} />

@@ -6,8 +6,14 @@ import type { ApplicationView, CheckReport, Finding } from "./types";
 
 const SEVERITY_LABEL = { ERROR: "Ошибка", WARNING: "Требует внимания", INFO: "Информация", OK: "Пройдено" } as const;
 
-const ROW_MARK = { FOUND: "x", MISSING: " ", CONDITIONAL_MISSING: "?", EXTRA: "+" } as const;
-const ROW_NOTE = { FOUND: "", MISSING: " — не хватает", CONDITIONAL_MISSING: " — условно требуется", EXTRA: " — лишний" } as const;
+const ROW_MARK = { FOUND: "x", MISSING: " ", CONDITIONAL_MISSING: "?", CONDITIONAL_UNKNOWN: "?", EXTRA: "+" } as const;
+const ROW_NOTE = {
+  FOUND: "",
+  MISSING: " — не хватает",
+  CONDITIONAL_MISSING: " — условно требуется",
+  CONDITIONAL_UNKNOWN: " — не указан признак проекта, применимость не определена",
+  EXTRA: " — лишний",
+} as const;
 
 function findingLine(f: Finding): string {
   const type = f.documentType ? ` [${typeShort(f.documentType)}]` : "";

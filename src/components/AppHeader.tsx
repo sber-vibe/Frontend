@@ -23,14 +23,29 @@ function initials(name: string): string {
     .join("");
 }
 
-export function AppHeader({ userName, isAdmin, onLogout }: { userName: string; isAdmin?: boolean; onLogout: () => void }) {
+function roleLabel(isSpecialist: boolean, isAdmin: boolean): string {
+  if (isSpecialist && isAdmin) return "Специалист · администратор";
+  return isAdmin ? "Администратор" : "Специалист";
+}
+
+export function AppHeader({
+  userName,
+  isAdmin = false,
+  isSpecialist = false,
+  onLogout,
+}: {
+  userName: string;
+  isAdmin?: boolean;
+  isSpecialist?: boolean;
+  onLogout: () => void;
+}) {
   const pathname = usePathname();
-  const nav = isAdmin ? [...NAV, ADMIN_NAV] : NAV;
+  const nav = [...(isSpecialist ? NAV : []), ...(isAdmin ? [ADMIN_NAV] : [])];
 
   return (
     <header className={`${s.header} no-print`}>
       <div className={`container ${s.inner}`}>
-        <Link href="/checks" aria-label="На главную">
+        <Link href={isSpecialist ? "/checks" : "/admin"} aria-label="На главную">
           <Logo />
         </Link>
 
@@ -47,12 +62,14 @@ export function AppHeader({ userName, isAdmin, onLogout }: { userName: string; i
         </nav>
 
         <div className={s.right}>
-          <ButtonLink href="/checks/new" size="sm" icon="plus" className={s.mobileNew} iconOnly aria-label="Новая заявка" />
+          {isSpecialist && (
+            <ButtonLink href="/checks/new" size="sm" icon="plus" className={s.mobileNew} iconOnly aria-label="Новая заявка" />
+          )}
           <div className={s.user} title={userName}>
             <span className={s.avatar}>{initials(userName) || "С"}</span>
             <span className={s.userName}>
               {userName}
-              <small className={s.userRole}>{isAdmin ? "Администратор" : "Специалист"}</small>
+              <small className={s.userRole}>{roleLabel(isSpecialist, isAdmin)}</small>
             </span>
           </div>
           <Button variant="ghost" size="sm" icon="logout" iconOnly onClick={onLogout} aria-label="Выйти" title="Выйти" />

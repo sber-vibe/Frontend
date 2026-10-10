@@ -2,39 +2,72 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { KNOWN_TYPES, typeTitle } from "@/lib/documentTypes";
-import { errorMessage } from "@/lib/useAsync";
-import type { Program, ProgramDocument } from "@/lib/types";
+import { typeTitle } from "@/lib/documentTypes";
+import { formatDateTime } from "@/lib/format";
+import type { ApplicationAttribute, Program, ProgramDocument } from "@/lib/types";
 import { Badge, Button, Icon, SelectField, TextField } from "@/components/ui";
+import { saveErrorMessage } from "./RulesEditor";
 import s from "./admin.module.scss";
 
 type Requirement = ProgramDocument["requirement"] | "NONE";
 
 interface Props {
   programs: Program[];
-  /** Типы документов с сервера — к ним добавляются известные типы кейса. */
+  /** Справочник типов, которые сервер умеет распознавать. Других типов в перечне быть не может. */
   types: string[];
+  /** Признаки проекта для условных документов; null — сервер их пока не поддерживает. */
+  attributes: ApplicationAttribute[] | null;
   onSave: (program: Program, isNew: boolean) => Promise<Program>;
 }
 
 const NEW_PROGRAM: Program = { code: "", name: "", description: "", active: true, documents: [] };
 
-function ProgramForm({ initial, isNew, types, onSave, onCancel }: {
+type Errors = Partial<Record<"code" | "name" | "documents" | `cond:${string}` | `attr:${string}`, string>>;
+
+/** Проверки формы; сервер повторяет их и может вернуть свои. */
+export function validateProgram(
+  draft: Program,
+  { isNew, takenCodes, attributes }: { isNew: boolean; takenCodes: string[]; attributes: ApplicationAttribute[] | null },
+): Errors {
+  const errors: Errors = {};
+  const code = draft.code.trim();
+  if (isNew) {
+    if (!code) errors.code = "Укажите код";
+    else if (!/^[A-Z][A-Z0-9_]*$/.test(code)) errors.code = "Латинские заглавные буквы, цифры и _";
+    else if (takenCodes.includes(code)) errors.code = "Программа с таким кодом уже есть";
+  }
+  if (!draft.name.trim()) errors.name = "Укажите название";
+  if (!draft.documents.some((d) => d.requirement === "REQUIRED")) errors.documents = "Добавьте хотя бы один обязательный документ";
+  for (const d of draft.documents) {
+    if (d.requirement !== "CONDITIONAL") continue;
+    if (!d.condition?.trim()) errors[`cond:${d.type}`] = "Опишите, когда документ нужен";
+    if (attributes && !d.conditionAttribute) errors[`attr:${d.type}`] = "Выберите признак проекта";
+  }
+  return errors;
+}
+
+function ProgramForm({ initial, isNew, types, attributes, takenCodes, onSave, onCancel }: {
   initial: Program;
   isNew: boolean;
   types: string[];
+  attributes: ApplicationAttribute[] | null;
+  takenCodes: string[];
   onSave: (p: Program) => Promise<void>;
   onCancel: () => void;
 }) {
   const [draft, setDraft] = useState<Program>(initial);
-  const [newType, setNewType] = useState("");
+  const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => setDraft(initial), [initial]);
 
-  const allTypes = Array.from(new Set([...types, ...KNOWN_TYPES, ...draft.documents.map((d) => d.type)]));
+  const supported = new Set(types);
+  // типы из справочника сервера + уже стоящие в перечне (их можно только убрать)
+  const allTypes = Array.from(new Set([...types, ...draft.documents.map((d) => d.type)]));
   const requirementOf = (type: string): Requirement => draft.documents.find((d) => d.type === type)?.requirement ?? "NONE";
+  const errors = validateProgram(draft, { isNew, takenCodes, attributes });
+  const shown = submitted ? errors : {};
 
   const setRequirement = (type: string, requirement: Requirement) =>
     setDraft((p) => {
@@ -42,21 +75,24 @@ function ProgramForm({ initial, isNew, types, onSave, onCancel }: {
       if (requirement === "NONE") return { ...p, documents: rest };
       const prev = p.documents.find((d) => d.type === type);
       const index = p.documents.findIndex((d) => d.type === type);
-      const next: ProgramDocument = { type, requirement, condition: requirement === "CONDITIONAL" ? (prev?.condition ?? "") : null };
+      const conditional = requirement === "CONDITIONAL";
+      const next: ProgramDocument = {
+        type,
+        requirement,
+        condition: conditional ? (prev?.condition ?? "") : null,
+        conditionAttribute: conditional ? (prev?.conditionAttribute ?? null) : null,
+      };
       // сохраняем порядок документов в перечне
       return { ...p, documents: index >= 0 ? p.documents.map((d) => (d.type === type ? next : d)) : [...rest, next] };
     });
 
-  const setCondition = (type: string, condition: string) =>
-    setDraft((p) => ({ ...p, documents: p.documents.map((d) => (d.type === type ? { ...d, condition } : d)) }));
+  const patchDoc = (type: string, patch: Partial<ProgramDocument>) =>
+    setDraft((p) => ({ ...p, documents: p.documents.map((d) => (d.type === type ? { ...d, ...patch } : d)) }));
 
   const submit = async () => {
-    if (!draft.code.trim() || !draft.name.trim()) {
-      setError("Укажите код и название программы");
-      return;
-    }
-    if (!draft.documents.some((d) => d.requirement === "REQUIRED")) {
-      setError("Добавьте хотя бы один обязательный документ");
+    setSubmitted(true);
+    if (Object.keys(errors).length > 0) {
+      setError("Исправьте отмеченные поля");
       return;
     }
     setSaving(true);
@@ -64,7 +100,7 @@ function ProgramForm({ initial, isNew, types, onSave, onCancel }: {
     try {
       await onSave({ ...draft, code: draft.code.trim(), name: draft.name.trim() });
     } catch (e) {
-      setError(errorMessage(e));
+      setError(saveErrorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -74,13 +110,19 @@ function ProgramForm({ initial, isNew, types, onSave, onCancel }: {
     <motion.div className={s.editor} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <div className={s.formRow}>
         <TextField
+          label="Название"
+          value={draft.name}
+          error={shown.name}
+          onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+        />
+        <TextField
           label="Код программы"
           value={draft.code}
           disabled={!isNew}
-          hint={isNew ? "Латиница, например INNOVATION" : "Код не меняется"}
+          error={shown.code}
+          hint={isNew ? "Технический код, например INNOVATION" : "Код не меняется"}
           onChange={(e) => setDraft({ ...draft, code: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "") })}
         />
-        <TextField label="Название" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
       </div>
       <TextField
         label="Описание"
@@ -93,6 +135,21 @@ function ProgramForm({ initial, isNew, types, onSave, onCancel }: {
       </label>
 
       <h3 className={s.subTitle}>Перечень документов</h3>
+      <p className={s.fieldNote}>
+        Виды документов — из справочника сервера: только их модель умеет распознавать. Условный документ нужен, когда у проекта
+        есть выбранный признак; специалист указывает признак в заявке.
+      </p>
+      {attributes === null && (
+        <p className={s.fieldNote} role="note">
+          <Icon name="info" size={14} /> Сервер пока не поддерживает признаки проекта: условие сохранится только текстом и не будет
+          проверяться автоматически.
+        </p>
+      )}
+      {shown.documents && (
+        <p className={s.error} role="alert">
+          <Icon name="alert" size={16} /> {shown.documents}
+        </p>
+      )}
       <ul className={s.docTable}>
         {allTypes.map((type) => {
           const requirement = requirementOf(type);
@@ -101,7 +158,7 @@ function ProgramForm({ initial, isNew, types, onSave, onCancel }: {
             <li key={type} data-requirement={requirement}>
               <span className={s.docName}>
                 {typeTitle(type)}
-                <small>{type}</small>
+                <small>{supported.has(type) ? type : `${type} · нет в справочнике сервера`}</small>
               </span>
               <SelectField
                 label={`Требование для «${typeTitle(type)}»`}
@@ -115,37 +172,32 @@ function ProgramForm({ initial, isNew, types, onSave, onCancel }: {
                 ]}
               />
               {requirement === "CONDITIONAL" && (
-                <input
-                  className={s.conditionInput}
-                  value={doc?.condition ?? ""}
-                  onChange={(e) => setCondition(type, e.target.value)}
-                  placeholder="Когда нужен: например, «если продукция подлежит сертификации»"
-                  aria-label={`Условие для «${typeTitle(type)}»`}
-                />
+                <div className={s.condition}>
+                  {attributes && (
+                    <SelectField
+                      label={`Признак проекта для «${typeTitle(type)}»`}
+                      value={doc?.conditionAttribute ?? ""}
+                      error={shown[`attr:${type}`]}
+                      onChange={(e) => patchDoc(type, { conditionAttribute: e.target.value || null })}
+                      options={[
+                        { value: "", label: "— выберите признак —" },
+                        ...attributes.map((a) => ({ value: a.code, label: a.name })),
+                      ]}
+                    />
+                  )}
+                  <TextField
+                    label={`Когда нужен «${typeTitle(type)}»`}
+                    value={doc?.condition ?? ""}
+                    error={shown[`cond:${type}`]}
+                    placeholder="Например, «если продукция подлежит сертификации»"
+                    onChange={(e) => patchDoc(type, { condition: e.target.value })}
+                  />
+                </div>
               )}
             </li>
           );
         })}
       </ul>
-      <div className={s.addType}>
-        <TextField
-          label="Новый вид документа"
-          hint="Код типа, который сервер умеет определять, например LICENSE"
-          value={newType}
-          onChange={(e) => setNewType(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))}
-        />
-        <Button
-          variant="outline"
-          icon="plus"
-          disabled={!newType || allTypes.includes(newType)}
-          onClick={() => {
-            setRequirement(newType, "REQUIRED");
-            setNewType("");
-          }}
-        >
-          Добавить в перечень
-        </Button>
-      </div>
 
       {error && (
         <p className={s.error} role="alert">
@@ -165,13 +217,18 @@ function ProgramForm({ initial, isNew, types, onSave, onCancel }: {
 }
 
 /** Программы субсидий и перечни документов — меняются администратором без правки кода. */
-export function ProgramsEditor({ programs, types, onSave }: Props) {
+export function ProgramsEditor({ programs, types, attributes, onSave }: Props) {
   const [editing, setEditing] = useState<{ program: Program; isNew: boolean } | null>(null);
+  const takenCodes = programs.map((p) => p.code);
+  const attributeName = (code?: string | null) => attributes?.find((a) => a.code === code)?.name ?? code;
 
   return (
     <div className={s.section}>
       <div className={s.sectionHead}>
-        <p>Для каждой программы — обязательные и условные документы. Изменения применяются к новым проверкам сразу после сохранения.</p>
+        <p>
+          Для каждой программы — обязательные и условные документы. Новый перечень применяется к следующим проверкам; завершённые
+          отчёты не пересчитываются.
+        </p>
         <Button icon="plus" onClick={() => setEditing({ program: NEW_PROGRAM, isNew: true })} disabled={editing?.isNew}>
           Новая программа
         </Button>
@@ -183,6 +240,8 @@ export function ProgramsEditor({ programs, types, onSave }: Props) {
             initial={editing.program}
             isNew
             types={types}
+            attributes={attributes}
+            takenCodes={takenCodes}
             onCancel={() => setEditing(null)}
             onSave={async (p) => {
               await onSave(p, true);
@@ -203,6 +262,13 @@ export function ProgramsEditor({ programs, types, onSave }: Props) {
                 <div>
                   <h3>{program.name}</h3>
                   {program.description && <p className={s.muted}>{program.description}</p>}
+                  {(program.version != null || program.updatedBy) && (
+                    <p className={s.version}>
+                      {program.version != null && `Версия ${program.version}`}
+                      {program.updatedBy && ` · изменил ${program.updatedBy}`}
+                      {program.updatedAt && `, ${formatDateTime(program.updatedAt)}`}
+                    </p>
+                  )}
                 </div>
                 {program.active === false && <Badge tone="neutral">Отключена</Badge>}
                 {!open && (
@@ -216,6 +282,8 @@ export function ProgramsEditor({ programs, types, onSave }: Props) {
                   initial={program}
                   isNew={false}
                   types={types}
+                  attributes={attributes}
+                  takenCodes={takenCodes}
                   onCancel={() => setEditing(null)}
                   onSave={async (p) => {
                     await onSave(p, false);
@@ -231,7 +299,7 @@ export function ProgramsEditor({ programs, types, onSave }: Props) {
                   ))}
                   {conditional.map((d) => (
                     <span key={d.type} className={s.chip} data-conditional="true" title={d.condition ?? undefined}>
-                      {typeTitle(d.type)} · условно
+                      {typeTitle(d.type)} · условно{d.conditionAttribute ? `: ${attributeName(d.conditionAttribute)}` : ""}
                     </span>
                   ))}
                 </div>

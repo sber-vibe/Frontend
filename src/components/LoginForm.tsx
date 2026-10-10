@@ -7,11 +7,13 @@ import { Button, Icon, SelectField, TextField } from "@/components/ui";
 
 interface LoginFormProps {
   oidcEnabled: boolean;
+  /** Демо-вход для разработки (NEXT_PUBLIC_DEMO_LOGIN=true). В сдаваемой сборке выключен. */
+  demoEnabled?: boolean;
   onDemoLogin: (name: string, role: Role) => void;
   onOidcLogin: () => Promise<void> | void;
 }
 
-export function LoginForm({ oidcEnabled, onDemoLogin, onOidcLogin }: LoginFormProps) {
+export function LoginForm({ oidcEnabled, demoEnabled = false, onDemoLogin, onOidcLogin }: LoginFormProps) {
   const [name, setName] = useState("");
   const [role, setRole] = useState<Role>("specialist");
   const [error, setError] = useState<string>();
@@ -51,6 +53,16 @@ export function LoginForm({ oidcEnabled, onDemoLogin, onOidcLogin }: LoginFormPr
     );
   }
 
+  if (!demoEnabled) {
+    return (
+      <p role="alert" style={{ display: "flex", gap: 8, fontSize: 14, color: "var(--danger, #c0392b)" }}>
+        <Icon name="alert" size={18} style={{ flexShrink: 0, marginTop: 1 }} />
+        Вход не настроен: не указан сервер авторизации (NEXT_PUBLIC_OIDC_ISSUER и NEXT_PUBLIC_OIDC_CLIENT_ID). Обратитесь к
+        администратору.
+      </p>
+    );
+  }
+
   return (
     <form onSubmit={submit} noValidate>
       <TextField
@@ -83,7 +95,7 @@ export function LoginForm({ oidcEnabled, onDemoLogin, onOidcLogin }: LoginFormPr
       </div>
       <p style={{ marginTop: 16, display: "flex", gap: 8, fontSize: 13, color: "var(--text-3)" }}>
         <Icon name="info" size={16} style={{ flexShrink: 0, marginTop: 2 }} />
-        Демо-режим: Keycloak не настроен (NEXT_PUBLIC_OIDC_ISSUER), backend работает без авторизации.
+        Режим разработки: роль выбирается вручную и не даёт прав на сервере. В сдаваемой сборке этого входа нет.
       </p>
     </form>
   );

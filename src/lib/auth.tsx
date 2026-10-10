@@ -33,15 +33,34 @@ export function rolesFromClaims(claims: Record<string, unknown>): Role[] {
   return (["specialist", "admin"] as const).filter((r) => roles.includes(r));
 }
 
+/** Отказ по умолчанию: нет сессии или ролей — нет доступа. Только для показа интерфейса, права проверяет backend. */
 export function hasRole(session: Session | null, role: Role): boolean {
-  // старые сессии без ролей — специалист
-  return (session?.roles ?? ["specialist"]).includes(role);
+  return session?.roles?.includes(role) ?? false;
+}
+
+/** Есть ли у пользователя хоть одна рабочая роль. Без неё рабочие экраны не открываются. */
+export function hasWorkRole(session: Session | null): boolean {
+  return hasRole(session, "specialist") || hasRole(session, "admin");
+}
+
+/** Стартовая страница по ролям: специалисту — заявки, администратору без роли специалиста — настройки. */
+export function homePath(session: Session | null): string {
+  return hasRole(session, "admin") && !hasRole(session, "specialist") ? "/admin" : "/checks";
+}
+
+/**
+ * Демо-вход с выбором роли — только для локальной разработки и тестов, включается явно
+ * (NEXT_PUBLIC_DEMO_LOGIN=true). В сдаваемой сборке без Keycloak входа нет.
+ */
+export function demoLoginEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_DEMO_LOGIN === "true";
 }
 
 interface AuthApi {
   session: Session | null;
   ready: boolean;
   oidcEnabled: boolean;
+  demoEnabled: boolean;
   loginDemo: (name: string, role?: Role) => void;
   loginOidc: (returnTo?: string) => Promise<void>;
   completeOidc: (tokens: TokenSet) => void;
@@ -77,6 +96,8 @@ function readSession(): Session | null {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const session = JSON.parse(raw) as Session;
+    // демо-сессия, оставшаяся от сборки разработчика, ничего не даёт
+    if (session.mode === "demo" && !demoLoginEnabled()) return null;
     // access token истёк, но сессию ещё можно продлить — восстановим её при загрузке
     if (session.expiresAt && session.expiresAt < Date.now() && !canRefresh(session)) return null;
     return session;
@@ -171,8 +192,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       ready,
       oidcEnabled: oidc !== null,
-      loginDemo: (name, role = "specialist") =>
-        update({ name: name.trim(), mode: "demo", roles: role === "admin" ? ["specialist", "admin"] : ["specialist"] }),
+      demoEnabled: demoLoginEnabled(),
+      loginDemo: (name, role = "specialist") => {
+        if (!demoLoginEnabled()) return;
+        update({ name: name.trim(), mode: "demo", roles: role === "admin" ? ["specialist", "admin"] : ["specialist"] });
+      },
       loginOidc: async (returnTo) => {
         if (!oidc) return;
         window.location.assign(await buildAuthorizeUrl(oidc, returnTo));
