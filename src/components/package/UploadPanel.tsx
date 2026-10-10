@@ -79,7 +79,7 @@ export function UploadPanel({ types, upload, onUploaded, compact }: Props) {
   const typeOptions = [{ value: "", label: "Выберите тип документа" }, ...types.map((t) => ({ value: t, label: typeTitle(t) }))];
 
   return (
-    <section className={s.uploadPanel} aria-label="Загрузка документов">
+    <section className={s.uploadPanel} id="upload" aria-label="Загрузка документов">
       <div
         className={s.dropzone}
         data-dragging={dragging}
@@ -116,7 +116,7 @@ export function UploadPanel({ types, upload, onUploaded, compact }: Props) {
         <div>
           <p className={s.dropTitle}>{dragging ? "Отпустите файлы" : "Перетащите документы сюда"}</p>
           <p className={s.dropHint}>
-            или <span className={s.dropLink}>выберите на устройстве</span> · PDF, JPG, PNG, DOCX, TXT до 10 МБ
+            или <span className={s.dropLink}>выберите на устройстве</span> · можно сразу несколько файлов · {config.acceptedFormatsLabel} до 10 МБ
           </p>
         </div>
         <input
@@ -143,7 +143,7 @@ export function UploadPanel({ types, upload, onUploaded, compact }: Props) {
           >
             {config.autoClassify ? (
               <p className={s.queueNote}>
-                <Icon name="sparkle" size={16} /> Тип каждого файла определит модель на сервере по содержимому.
+                <Icon name="sparkle" size={16} /> Тип каждого файла определит модель на сервере по содержимому, а не по имени. Файлы принимаются сразу, проверка идёт в фоне.
               </p>
             ) : (
               <p className={s.queueNote}>
@@ -171,7 +171,7 @@ export function UploadPanel({ types, upload, onUploaded, compact }: Props) {
                         {item.status === "error"
                           ? item.error
                           : item.status === "done"
-                            ? "Загружено"
+                            ? "Принят"
                             : item.status === "uploading"
                               ? "Загрузка…"
                               : formatFileSize(item.file.size)}

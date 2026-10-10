@@ -4,13 +4,15 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { config } from "@/lib/config";
 import { selectableTypes } from "@/lib/documentTypes";
 import { formatMoney, pluralize } from "@/lib/format";
-import { effectiveType, reportStatusView } from "@/lib/presentation";
+import { DECISION_VIEW, documentFindings, isProcessing, needsPolling, reportStatusView } from "@/lib/presentation";
 import { errorMessage, useAsync } from "@/lib/useAsync";
 import type { ApplicationView, DocumentTypeCode, DocumentView } from "@/lib/types";
 import { BackLink } from "@/components/BackLink";
-import { Badge, Button, ButtonLink, EmptyState, ErrorState, Skeleton } from "@/components/ui";
+import Link from "next/link";
+import { Badge, Button, ButtonLink, EmptyState, ErrorState, Icon, Skeleton, Spinner } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
 import { DocumentDetails } from "./DocumentDetails";
@@ -44,6 +46,19 @@ export function PackageWorkspace({ id }: { id: string }) {
     [mutate],
   );
 
+  // Фоновая обработка: пока сервер разбирает файлы, опрашиваем заявку и показываем результат по мере готовности.
+  const polling = app ? needsPolling(app) : false;
+  useEffect(() => {
+    if (!polling) return;
+    const timer = setInterval(() => {
+      api.getApplication(id).then(
+        (fresh) => setApp(() => fresh),
+        () => undefined, // временная ошибка сети — попробуем на следующем тике
+      );
+    }, config.pollInterval);
+    return () => clearInterval(timer);
+  }, [polling, id, setApp]);
+
   // если выбранного документа нет (удалён или ещё не выбран) — выбираем первый
   useEffect(() => {
     if (!app) return;
@@ -71,11 +86,9 @@ export function PackageWorkspace({ id }: { id: string }) {
 
   const selected = app.documents.find((d) => d.id === selectedId) ?? null;
   const status = reportStatusView(app.report, app.documents.length);
-  const docFindings = selected && app.report
-    ? app.report.findings.filter(
-        (f) => f.documentId === selected.id || (!f.documentId && f.documentType && f.documentType === effectiveType(selected)),
-      )
-    : [];
+  const docFindings = selected ? documentFindings(selected, app.report) : [];
+  const processingCount = app.documents.filter(isProcessing).length;
+  const decision = app.decision ? DECISION_VIEW[app.decision.decision] : null;
 
   const replaceDocument = (oldId: string, next: DocumentView) =>
     setApp((a) => ({ ...a, report: null, documents: a.documents.map((d) => (d.id === oldId ? next : d)) }));
@@ -103,6 +116,17 @@ export function PackageWorkspace({ id }: { id: string }) {
         toast.error("Не удалось изменить тип", errorMessage(err));
         throw err;
       }
+    }
+  };
+
+  const reprocess = async (doc: DocumentView) => {
+    try {
+      const updated = await api.reprocessDocument(id, doc.id);
+      replaceDocument(doc.id, updated);
+      toast.success("Документ отправлен на повторную обработку");
+    } catch (e) {
+      const msg = e instanceof ApiError && e.isUnsupported ? "Сервер пока не поддерживает повторную обработку" : errorMessage(e);
+      toast.error("Не удалось повторить обработку", msg);
     }
   };
 
@@ -157,12 +181,24 @@ export function PackageWorkspace({ id }: { id: string }) {
           <div className={s.headerTitle}>
             <h1>{app.applicantName}</h1>
             <Badge tone={status.tone}>{status.label}</Badge>
+            {decision && <Badge tone={decision.tone}>Решение: {decision.label}</Badge>}
           </div>
           <p className={s.headerProject}>{app.projectName}</p>
           <dl className={s.headerFacts}>
             <div>
+              <dt>Программа</dt>
+              <dd>
+                {app.programName ?? app.programCode ?? "Определяется из заявления"}
+                {app.programDetected && <small className={s.headerHint}> · определена по заявлению</small>}
+              </dd>
+            </div>
+            <div>
               <dt>ИНН</dt>
-              <dd>{app.inn}</dd>
+              <dd>
+                <Link href={`/organizations/${app.inn}`} title="История проверок организации">
+                  {app.inn}
+                </Link>
+              </dd>
             </div>
             <div>
               <dt>Сумма субсидии</dt>
@@ -177,16 +213,54 @@ export function PackageWorkspace({ id }: { id: string }) {
           </dl>
         </div>
         <div className={s.headerActions}>
+          <ButtonLink href={`/checks/${id}/journal`} variant="ghost" icon="clock">
+            Журнал
+          </ButtonLink>
           {app.report && (
             <ButtonLink href={`/checks/${id}/result`} variant="outline" icon="list">
               Итог проверки
             </ButtonLink>
           )}
-          <Button icon="shield" onClick={runCheck} loading={checking} disabled={docsCount === 0}>
+          <Button
+            icon="shield"
+            onClick={runCheck}
+            loading={checking}
+            disabled={docsCount === 0 || processingCount > 0}
+            title={processingCount > 0 ? "Дождитесь окончания обработки файлов" : undefined}
+          >
             {app.report ? "Проверить заново" : "Запустить проверку"}
           </Button>
         </div>
       </motion.header>
+
+      {app.duplicateOf && (
+        <div className={s.banner} data-tone="warning" role="status">
+          <Icon name="alert" size={18} />
+          <span>
+            Этот пакет уже проверялся. <Link href={`/checks/${app.duplicateOf}`}>Открыть предыдущую проверку</Link>
+          </span>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {processingCount > 0 && (
+          <motion.div
+            className={s.banner}
+            data-tone="info"
+            role="status"
+            aria-live="polite"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <Spinner />
+            <span>
+              Обрабатывается {processingCount} {pluralize(processingCount, ["файл", "файла", "файлов"])} из {docsCount}. Результаты
+              появляются по мере готовности — можно работать с уже проверенными документами.
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <UploadPanel
         types={types}
@@ -194,8 +268,12 @@ export function PackageWorkspace({ id }: { id: string }) {
         upload={(file, type) => api.uploadDocument(id, file, type)}
         onUploaded={(docs) => {
           toast.success(
-            `Загружено ${docs.length} ${pluralize(docs.length, ["документ", "документа", "документов"])}`,
-            app.report ? "Предыдущий отчёт сброшен — запустите проверку заново" : undefined,
+            `Принято ${docs.length} ${pluralize(docs.length, ["файл", "файла", "файлов"])}`,
+            docs.some(isProcessing)
+              ? "Сервер определяет тип и проверяет документы в фоне"
+              : app.report
+                ? "Предыдущий отчёт сброшен — запустите проверку заново"
+                : undefined,
           );
           setSelectedId(docs[0].id);
           void reload();
@@ -247,6 +325,7 @@ export function PackageWorkspace({ id }: { id: string }) {
                   findings={docFindings}
                   onChangeType={(type) => changeType(selected, type)}
                   onChangeField={(name, value) => changeField(selected, name, value)}
+                  onReprocess={() => reprocess(selected)}
                   onDelete={() => setToDelete(selected)}
                 />
               </motion.div>

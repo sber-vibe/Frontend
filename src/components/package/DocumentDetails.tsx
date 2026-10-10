@@ -2,11 +2,21 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { fieldLabel, typeTitle } from "@/lib/documentTypes";
+import { fieldLabel, formatFieldValue, typeTitle } from "@/lib/documentTypes";
 import { formatDateTime, formatFileSize, formatPercent } from "@/lib/format";
-import { confidenceTone, effectiveType, findingSeverity, needsConfirmation, SEVERITY_TONE } from "@/lib/presentation";
-import type { DocumentTypeCode, DocumentView, ExtractedField, Finding } from "@/lib/types";
-import { Badge, Button, Icon, SelectField } from "@/components/ui";
+import {
+  confidenceTone,
+  effectiveType,
+  findingSeverity,
+  isProcessing,
+  needsConfirmation,
+  processingLabel,
+  processingStatus,
+  SEVERITY_TONE,
+} from "@/lib/presentation";
+import type { DocumentTypeCode, DocumentView, ExtractedField, Finding, Severity } from "@/lib/types";
+import { Badge, Button, Icon, SelectField, type IconName } from "@/components/ui";
+import { ProcessingSteps } from "./DocumentList";
 import s from "./package.module.scss";
 
 interface Props {
@@ -15,8 +25,11 @@ interface Props {
   findings: Finding[];
   onChangeType: (type: DocumentTypeCode) => Promise<void>;
   onChangeField: (name: string, value: string) => Promise<void>;
+  onReprocess?: () => Promise<void>;
   onDelete: () => void;
 }
+
+const FINDING_ICON: Record<Severity, IconName> = { ERROR: "error", WARNING: "alert", INFO: "info", OK: "success" };
 
 function ConfidenceMeter({ value }: { value: number }) {
   const tone = confidenceTone(value);
@@ -96,7 +109,10 @@ function FieldRow({ field, onSave }: { field: ExtractedField; onSave: (value: st
         </form>
       ) : (
         <span className={s.fieldValueRow}>
-          <span className={s.fieldValue}>{field.value === null || field.value === "" ? "—" : String(field.value)}</span>
+          <span className={s.fieldValue}>
+            {formatFieldValue(field.name, field.value)}
+            {field.source && <span className={s.fieldSource}>«{field.source}»</span>}
+          </span>
           {typeof field.confidence === "number" && (
             <span className={s.fieldConf} data-tone={confidenceTone(field.confidence)}>
               {formatPercent(field.confidence)}
@@ -111,13 +127,25 @@ function FieldRow({ field, onSave }: { field: ExtractedField; onSave: (value: st
   );
 }
 
-export function DocumentDetails({ document: doc, types, findings, onChangeType, onChangeField, onDelete }: Props) {
+export function DocumentDetails({ document: doc, types, findings, onChangeType, onChangeField, onReprocess, onDelete }: Props) {
   const [editingType, setEditingType] = useState(false);
   const current = effectiveType(doc);
   const [newType, setNewType] = useState(current ?? "");
   const [saving, setSaving] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const uncertain = needsConfirmation(doc);
-  const processing = doc.processingStatus === "PENDING" || doc.processingStatus === "PROCESSING";
+  const processing = isProcessing(doc);
+  const failed = processingStatus(doc) === "FAILED";
+
+  const retry = async () => {
+    if (!onReprocess) return;
+    setRetrying(true);
+    try {
+      await onReprocess();
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   useEffect(() => {
     setEditingType(false);
@@ -161,11 +189,42 @@ export function DocumentDetails({ document: doc, types, findings, onChangeType, 
           ) : (
             <motion.div key="view" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}>
               <h2 className={s.detailsType}>
-                {processing ? "Определяется моделью…" : uncertain && current ? `Предположительно: ${typeTitle(current)}` : typeTitle(current)}
+                {processing ? processingLabel(doc) + "…" : uncertain && current ? `Предположительно: ${typeTitle(current)}` : typeTitle(current)}
               </h2>
+              {doc.typeSource === "SPECIALIST" ? (
+                <p className={s.typeSource}>
+                  <Icon name="edit" size={14} /> Тип указан специалистом
+                  {doc.typeChangedBy ? ` ${doc.typeChangedBy}` : ""}
+                  {doc.typeChangedAt ? `, ${formatDateTime(doc.typeChangedAt)}` : ""}
+                  {doc.detectedType && doc.detectedType !== doc.type ? ` · модель предлагала: ${typeTitle(doc.detectedType)}` : ""}
+                </p>
+              ) : (
+                doc.typeSource === "MODEL" &&
+                !processing && (
+                  <p className={s.typeSource}>
+                    <Icon name="sparkle" size={14} /> Определено моделью по содержимому файла
+                  </p>
+                )
+              )}
             </motion.div>
           )}
         </AnimatePresence>
+
+        {doc.processingStatus && <ProcessingSteps doc={doc} />}
+
+        {failed && (
+          <div className={s.failBanner} role="alert">
+            <p>
+              <Icon name="error" size={18} />
+              {doc.processingError || "Не удалось обработать файл. Данные не извлечены — ничего не подставлено."}
+            </p>
+            {onReprocess && (
+              <Button size="sm" variant="outline" icon="refresh" onClick={retry} loading={retrying}>
+                Повторить обработку
+              </Button>
+            )}
+          </div>
+        )}
 
         {typeof doc.confidence === "number" && !processing && <ConfidenceMeter value={doc.confidence} />}
 
@@ -196,7 +255,7 @@ export function DocumentDetails({ document: doc, types, findings, onChangeType, 
           <ul className={s.docFindings}>
             {findings.map((f, i) => (
               <li key={`${f.code}-${i}`} data-tone={SEVERITY_TONE[findingSeverity(f)]}>
-                <Icon name={findingSeverity(f) === "ERROR" ? "error" : "alert"} size={16} />
+                <Icon name={FINDING_ICON[findingSeverity(f)]} size={16} />
                 {f.message}
               </li>
             ))}

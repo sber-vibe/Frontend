@@ -805,6 +805,10 @@
     &[data-tone="info"] {
       background: var(--info-50);
     }
+    &[data-tone="success"] {
+      background: var(--green-50);
+      color: var(--green-700);
+    }
   }
 }
 
@@ -927,4 +931,190 @@
 .deleteBtn {
   align-self: flex-start;
   margin-top: 4px;
+}
+
+/* ---------- Фоновая обработка, баннеры, источник типа ---------- */
+
+.headerHint {
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  a {
+    color: inherit;
+    font-weight: 700;
+    text-decoration: underline;
+  }
+
+  &[data-tone="info"] {
+    background: var(--info-50);
+    color: #05608f;
+  }
+
+  &[data-tone="warning"] {
+    background: var(--warning-50);
+    color: #8a5300;
+  }
+
+  &[data-tone="danger"] {
+    background: var(--danger-50);
+    color: #a3221b;
+  }
+}
+
+/* шкала «Принят → Определяется → Проверен» */
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--text-3);
+
+  li {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+
+    &:not(:last-child)::after {
+      content: "";
+      width: 12px;
+      height: 2px;
+      margin-left: 2px;
+      border-radius: 2px;
+      background: var(--border);
+    }
+
+    &[data-state="done"] {
+      color: var(--green-700);
+
+      &::after {
+        background: var(--green);
+      }
+    }
+
+    &[data-state="active"] {
+      color: var(--info);
+      font-weight: 700;
+    }
+
+    &[data-state="failed"] {
+      color: var(--danger);
+      font-weight: 700;
+    }
+  }
+}
+
+.stepDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+
+  [data-state="active"] > & {
+    animation: stepPulse 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes stepPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 0.4;
+  }
+}
+
+.docStatusLine {
+  display: block;
+  margin-top: 4px;
+}
+
+.docOutcome {
+  font-size: 12px;
+  font-weight: 600;
+
+  &[data-tone="success"] {
+    color: var(--green-700);
+  }
+
+  &[data-tone="warning"] {
+    color: #8a5300;
+  }
+
+  &[data-tone="danger"] {
+    color: var(--danger);
+  }
+
+  &[data-tone="info"] {
+    color: var(--info);
+  }
+
+  &[data-tone="neutral"] {
+    color: var(--text-3);
+  }
+}
+
+.typeSource {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-2);
+
+  svg {
+    color: var(--info);
+  }
+}
+
+.failBanner {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--danger-50);
+  color: #a3221b;
+  font-size: 14px;
+
+  p {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    font-weight: 600;
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+.fieldSource {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-3);
+  font-style: italic;
 }
