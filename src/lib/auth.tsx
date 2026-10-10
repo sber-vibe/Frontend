@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { setTokenProvider } from "./api";
+import { setTokenProvider, setUnauthorizedHandler } from "./api";
 import { buildAuthorizeUrl, decodeJwt, getOidcConfig, logoutUrl, type TokenSet } from "./oidc";
 
 export type Role = "specialist" | "admin";
@@ -40,6 +40,27 @@ interface AuthApi {
 }
 
 const STORAGE_KEY = "subsidy.session";
+/** Пометка для страницы входа: сессия завершилась сама, а не по кнопке «Выйти». */
+const EXPIRED_KEY = "subsidy.session.expired";
+
+/** Прочитать и сбросить пометку об истёкшей сессии. */
+export function takeSessionExpired(): boolean {
+  try {
+    const expired = sessionStorage.getItem(EXPIRED_KEY) === "1";
+    sessionStorage.removeItem(EXPIRED_KEY);
+    return expired;
+  } catch {
+    return false;
+  }
+}
+
+function markSessionExpired() {
+  try {
+    sessionStorage.setItem(EXPIRED_KEY, "1");
+  } catch {
+    /* без пометки страница входа просто не покажет пояснение */
+  }
+}
 const AuthContext = createContext<AuthApi | null>(null);
 
 function readSession(): Session | null {
@@ -81,6 +102,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     writeSession(next);
     setSession(next);
   }, []);
+
+  // Токен Keycloak истёк или отозван: завершаем сессию — рабочие страницы отправят на вход с возвратом назад.
+  const expire = useCallback(() => {
+    markSessionExpired();
+    update(null);
+  }, [update]);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      if (session?.mode === "oidc") expire();
+    });
+  }, [session, expire]);
+
+  useEffect(() => {
+    if (session?.mode !== "oidc" || !session.expiresAt) return;
+    const timer = setTimeout(expire, Math.max(0, session.expiresAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [session, expire]);
 
   const api = useMemo<AuthApi>(
     () => ({

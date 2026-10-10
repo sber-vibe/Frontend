@@ -21,8 +21,8 @@ const report = makeReport({
 });
 const app = makeApplication({
   documents: [
-    makeDocument({ id: "d1", type: "APPLICATION" }),
-    makeDocument({ id: "d2", type: "BANK_STATEMENT", filename: "scan4.jpg" }),
+    makeDocument({ id: "d1", type: "APPLICATION", processingStatus: "DONE" }),
+    makeDocument({ id: "d2", type: "BANK_STATEMENT", filename: "scan4.jpg", processingStatus: "DONE" }),
   ],
   report,
 });
@@ -85,6 +85,20 @@ describe("ReportView", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Пройдено" })).toBeInTheDocument();
     expect(screen.getByText("Замечаний нет")).toBeInTheDocument();
     expect(api.calls("POST /applications/app-1/check")).toHaveLength(1);
+  });
+
+  it("FE-01: не показывает «Пройдено», если по части файлов нет результата обработки", async () => {
+    mockApi({
+      "GET /applications/app-1": {
+        ...app,
+        documents: [...app.documents, makeDocument({ id: "d9", filename: "x.pdf" })],
+        report: makeReport({ status: "PASSED", findings: [] }),
+      },
+      "GET /document-types": REQUIRED,
+    });
+    renderWithProviders(<ReportView id="app-1" />);
+    expect(await screen.findByRole("heading", { level: 1, name: "Результат неполный" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "Пройдено" })).not.toBeInTheDocument();
   });
 
   it("сохраняет решение специалиста; для возврата нужна причина", async () => {

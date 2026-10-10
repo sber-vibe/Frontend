@@ -280,7 +280,7 @@ export function DocumentDetails({ document: doc, types, findings, onChangeType, 
         {!editingType && (
           <div className={s.detailsActions}>
             {uncertain && current && (
-              <Button size="sm" icon="check" onClick={() => onChangeType(current)}>
+              <Button size="sm" icon="check" onClick={() => void onChangeType(current).catch(() => undefined)}>
                 Подтвердить
               </Button>
             )}

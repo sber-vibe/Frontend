@@ -43,6 +43,11 @@
   color: var(--danger);
   font-weight: 500;
   overflow: hidden;
+  flex-wrap: wrap;
+
+  > span {
+    flex: 1 1 240px;
+  }
 }
 
 .note {

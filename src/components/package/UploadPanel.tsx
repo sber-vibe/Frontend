@@ -50,7 +50,6 @@ export function UploadPanel({ types, upload, onUploaded, compact }: Props) {
     setQueue((q) => q.map((i) => (i.key === key ? { ...i, ...data } : i)));
 
   const pending = queue.filter((i) => i.status === "ready");
-  const missingType = !config.autoClassify && pending.some((i) => !i.type);
 
   const uploadAll = async () => {
     setBusy(true);
@@ -59,7 +58,7 @@ export function UploadPanel({ types, upload, onUploaded, compact }: Props) {
     for (const item of pending) {
       patch(item.key, { status: "uploading", error: undefined });
       try {
-        uploaded.push(await upload(item.file, config.autoClassify ? null : item.type || null));
+        uploaded.push(await upload(item.file, item.type || null));
         patch(item.key, { status: "done" });
       } catch (e) {
         patch(item.key, { status: "error", error: errorMessage(e) });
@@ -76,7 +75,7 @@ export function UploadPanel({ types, upload, onUploaded, compact }: Props) {
     if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
   };
 
-  const typeOptions = [{ value: "", label: "Выберите тип документа" }, ...types.map((t) => ({ value: t, label: typeTitle(t) }))];
+  const typeOptions = [{ value: "", label: "Определить по содержимому" }, ...types.map((t) => ({ value: t, label: typeTitle(t) }))];
 
   return (
     <section className={s.uploadPanel} id="upload" aria-label="Загрузка документов">
@@ -141,15 +140,10 @@ export function UploadPanel({ types, upload, onUploaded, compact }: Props) {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
           >
-            {config.autoClassify ? (
-              <p className={s.queueNote}>
-                <Icon name="sparkle" size={16} /> Тип каждого файла определит модель на сервере по содержимому, а не по имени. Файлы принимаются сразу, проверка идёт в фоне.
-              </p>
-            ) : (
-              <p className={s.queueNote}>
-                <Icon name="info" size={16} /> Текущий backend принимает тип документа при загрузке — укажите его для каждого файла.
-              </p>
-            )}
+            <p className={s.queueNote}>
+              <Icon name="sparkle" size={16} /> Тип каждого файла определит сервер по содержимому, а не по имени. Указывать тип
+              не обязательно{config.autoClassify ? "" : ": выберите его, только если уверены"}. Ход обработки виден в списке документов.
+            </p>
             <ul className={s.queueList}>
               <AnimatePresence initial={false}>
                 {queue.map((item) => (
@@ -204,13 +198,7 @@ export function UploadPanel({ types, upload, onUploaded, compact }: Props) {
               </AnimatePresence>
             </ul>
             <div className={s.queueActions}>
-              {missingType && <span className={s.queueWarn}>Укажите тип для всех файлов</span>}
-              <Button
-                icon="upload"
-                onClick={uploadAll}
-                loading={busy}
-                disabled={pending.length === 0 || missingType}
-              >
+              <Button icon="upload" onClick={uploadAll} loading={busy} disabled={pending.length === 0}>
                 Загрузить {pending.length > 0 ? `(${pending.length})` : ""}
               </Button>
             </div>

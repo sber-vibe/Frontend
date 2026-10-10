@@ -2,11 +2,11 @@
 
 import { motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { LoginForm } from "@/components/LoginForm";
 import { Logo } from "@/components/Logo";
 import { Icon, type IconName } from "@/components/ui";
-import { useAuth } from "@/lib/auth";
+import { takeSessionExpired, useAuth } from "@/lib/auth";
 import s from "./login.module.scss";
 
 const FEATURES: { icon: IconName; title: string; text: string }[] = [
@@ -23,6 +23,9 @@ function LoginContent() {
   const { session, ready, oidcEnabled, loginDemo, loginOidc } = useAuth();
   const router = useRouter();
   const returnTo = safeReturnTo(useSearchParams().get("returnTo"));
+  const [expired, setExpired] = useState(false);
+
+  useEffect(() => setExpired(takeSessionExpired()), []);
 
   useEffect(() => {
     if (ready && session) router.replace(returnTo);
@@ -68,6 +71,12 @@ function LoginContent() {
         >
           <h2>Вход для специалиста</h2>
           <p className={s.subtitle}>Рабочее место проверки заявок на субсидию</p>
+          {expired && (
+            <p className={s.expired} role="alert">
+              <Icon name="clock" size={16} /> Сессия истекла. Войдите снова — вы вернётесь на ту же страницу. Последнее действие
+              не было выполнено, повторите его после входа.
+            </p>
+          )}
           <LoginForm
             oidcEnabled={oidcEnabled}
             onDemoLogin={(name, role) => {

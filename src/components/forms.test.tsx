@@ -65,9 +65,19 @@ describe("CreateCheckForm", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ programCode: "INNOVATION" }));
   });
 
+  it("без перечня программ не даёт создать заявку и предлагает повторить запрос", async () => {
+    const onRetry = vi.fn();
+    render(<CreateCheckForm onSubmit={vi.fn()} onCreated={vi.fn()} programs={null} onRetryPrograms={onRetry} />);
+    expect(screen.getByRole("alert")).toHaveTextContent(/Создать заявку сейчас нельзя/);
+    expect(screen.queryByText(/определит backend/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Создать/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Повторить" }));
+    expect(onRetry).toHaveBeenCalled();
+  });
+
   it("показывает ошибку сервера и позволяет повторить", async () => {
     const onSubmit = vi.fn().mockRejectedValue(new ApiError(409, "Достигнут лимит проверок"));
-    render(<CreateCheckForm onSubmit={onSubmit} onCreated={vi.fn()} programs={null} />);
+    render(<CreateCheckForm onSubmit={onSubmit} onCreated={vi.fn()} programs={programs} />);
     await userEvent.click(screen.getByRole("button", { name: /Создать/ }));
     expect(await screen.findByText("Достигнут лимит проверок")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Создать/ })).toBeEnabled();

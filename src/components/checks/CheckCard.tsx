@@ -9,7 +9,7 @@ import { Badge, Icon } from "@/components/ui";
 import s from "./checks.module.scss";
 
 export function CheckCard({ app }: { app: ApplicationView }) {
-  const status = reportStatusView(app.report, app.documents.length);
+  const status = reportStatusView(app.report, app.documents);
   const groups = app.report ? groupFindings(app.report.findings) : null;
   const docs = app.documents.length;
   const processing = app.documents.filter(isProcessing).length;

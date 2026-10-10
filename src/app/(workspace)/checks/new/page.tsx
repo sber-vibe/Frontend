@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CreateCheckForm } from "@/components/checks/CreateCheckForm";
 import { BackLink } from "@/components/BackLink";
 import { Icon } from "@/components/ui";
@@ -22,10 +22,12 @@ export default function NewCheckPage() {
   const toast = useToast();
   const [programs, setPrograms] = useState<Program[] | null | undefined>(undefined);
 
-  useEffect(() => {
-    // перечень программ необязателен: без него программу определяет сервер из заявления
+  const loadPrograms = useCallback(() => {
+    setPrograms(undefined);
     api.programs().then(setPrograms, () => setPrograms(null));
   }, []);
+
+  useEffect(loadPrograms, [loadPrograms]);
 
   return (
     <div className={s.page}>
@@ -41,6 +43,7 @@ export default function NewCheckPage() {
           <p className={s.lead}>Выберите программу субсидии — остальное система возьмёт из документов пакета.</p>
           <CreateCheckForm
             programs={programs}
+            onRetryPrograms={loadPrograms}
             onSubmit={api.createApplication}
             onCreated={(app) => {
               toast.success("Заявка создана", "Загрузите пакет — реквизиты заполнятся по документам");

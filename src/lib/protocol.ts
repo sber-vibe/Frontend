@@ -16,7 +16,7 @@ function findingLine(f: Finding): string {
 
 /** Текстовый протокол проверки — дословно по отчёту сервера, для передачи заявителю и архива. */
 export function buildProtocol(app: ApplicationView, report: CheckReport, requiredTypes: string[], specialist?: string): string {
-  const status = reportStatusView(report, app.documents.length);
+  const status = reportStatusView(report, app.documents);
   const groups = groupFindings(report.findings);
   const completeness = completenessRows(requiredTypes, report);
   const decision = app.decision ? DECISION_VIEW[app.decision.decision] : null;

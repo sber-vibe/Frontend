@@ -13,7 +13,11 @@ import { fieldLabel, selectableTypes, typeShort, typeTitle } from "./documentTyp
 import {
   completenessRows,
   confidenceTone,
+  documentOutcomeLabel,
   documentTone,
+  isProcessing,
+  processingLabel,
+  processingStatus,
   findingSeverity,
   groupFindings,
   matchesFilter,
@@ -149,11 +153,33 @@ describe("presentation", () => {
     expect(confidenceTone(0.2)).toBe("danger");
   });
 
-  it("отмечает документ по замечаниям сервера", () => {
+  it("отмечает документ по замечаниям сервера, но без явного итога не показывает успех", () => {
     const doc = makeDocument({ type: "COST_ESTIMATE" });
     expect(documentTone(doc, null)).toBe("neutral");
     expect(documentTone(doc, makeReport())).toBe("danger");
-    expect(documentTone(makeDocument(), makeReport())).toBe("success");
+    // нет замечаний — это ещё не «пройдено»
+    expect(documentTone(makeDocument(), makeReport())).toBe("neutral");
+    expect(documentOutcomeLabel(makeDocument(), makeReport())).toBe("Нет результата обработки");
+    expect(documentOutcomeLabel(makeDocument({ processingStatus: "DONE" }), makeReport())).toBe("Нет итога по файлу");
+    expect(documentTone(makeDocument({ processingStatus: "DONE", outcome: "PASSED" }), makeReport())).toBe("success");
+  });
+
+  it("FE-01: отсутствие статуса обработки — не «проверен», UNKNOWN — не успех", () => {
+    expect(processingStatus(makeDocument())).toBeNull();
+    expect(isProcessing(makeDocument())).toBe(false);
+    expect(processingLabel(makeDocument())).toBe("Нет результата обработки");
+    const unknown = makeDocument({ type: "UNKNOWN", processingStatus: "DONE" });
+    expect(documentTone(unknown, makeReport({ findings: [] }))).toBe("warning");
+  });
+
+  it("FE-01: пройденный отчёт без результата по всем файлам — «Результат неполный»", () => {
+    const passed = makeReport({ status: "PASSED", findings: [] });
+    const done = makeDocument({ id: "a", processingStatus: "DONE" });
+    expect(reportStatusView(passed, [done]).tone).toBe("success");
+    expect(reportStatusView(passed, [done, makeDocument({ id: "b" })]).label).toBe("Результат неполный");
+    expect(reportStatusView(passed, [done, makeDocument({ id: "c", processingStatus: "FAILED" })]).tone).toBe("warning");
+    expect(reportStatusView(passed, [makeDocument({ id: "d", type: "UNKNOWN", processingStatus: "DONE" })]).tone).toBe("warning");
+    expect(reportStatusView(makeReport({ status: "SOMETHING_NEW" }), [done]).tone).toBe("neutral");
   });
 
   it("строит строки комплектности по обязательным типам и замечаниям", () => {

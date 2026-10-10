@@ -8,6 +8,7 @@ import { PackageWorkspace } from "./PackageWorkspace";
 import { RequisitesPanel } from "./RequisitesPanel";
 import { jsonResponse, makeApplication, makeDocument, makeReport } from "@/test/fixtures";
 import { mockApi } from "@/test/mockApi";
+import { ApiError } from "@/lib/api";
 import { renderWithProviders } from "@/test/render";
 import { router } from "@/test/navigation";
 
@@ -25,11 +26,15 @@ describe("UploadPanel", () => {
     expect(screen.getByText(/Формат не поддерживается/)).toBeInTheDocument();
   });
 
-  it("требует выбрать тип, пока backend не классифицирует сам", async () => {
-    render(<UploadPanel types={TYPES} upload={vi.fn()} onUploaded={vi.fn()} />);
+  it("загружает без выбора типа — тип определяет сервер", async () => {
+    const upload = vi.fn().mockResolvedValue(makeDocument({ processingStatus: "UPLOADED" }));
+    const onUploaded = vi.fn();
+    render(<UploadPanel types={TYPES} upload={upload} onUploaded={onUploaded} />);
     await userEvent.upload(screen.getByTestId("file-input"), pdf());
-    expect(screen.getByText("Укажите тип для всех файлов")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Загрузить/ })).toBeDisabled();
+    expect(screen.getByText(/Указывать тип\s+не обязательно/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Загрузить/ }));
+    await waitFor(() => expect(onUploaded).toHaveBeenCalled());
+    expect(upload).toHaveBeenCalledWith(expect.any(File), null);
   });
 
   it("загружает файлы по очереди с выбранными типами", async () => {
@@ -216,6 +221,46 @@ describe("RequisitesPanel", () => {
 });
 
 describe("DocumentViewer", () => {
+  const docx = makeDocument({ filename: "смета.docx" });
+  const original = () => Promise.resolve(new Blob(["PK"]));
+
+  it("FE-05: показывает серверную версию DOCX рядом с результатом, ожидая конвертацию", async () => {
+    const loadPreview = vi
+      .fn()
+      .mockResolvedValueOnce({ state: "pending", retryAfterMs: 10 })
+      .mockResolvedValueOnce({ state: "ready", format: "pdf", blob: new Blob(["%PDF"]) });
+    render(<DocumentViewer document={docx} load={original} loadPreview={loadPreview} />);
+    expect(await screen.findByText("Сервер готовит версию документа для просмотра…")).toBeInTheDocument();
+    expect(await screen.findByTitle("Просмотр: смета.docx")).toBeInTheDocument();
+    expect(screen.getByText(/Версия для просмотра, подготовленная сервером/)).toBeInTheDocument();
+    expect(loadPreview).toHaveBeenCalledTimes(2);
+  });
+
+  it("FE-05: HTML-версию показывает в изолированном фрейме", async () => {
+    const loadPreview = vi.fn().mockResolvedValue({ state: "ready", format: "html", blob: new Blob(["<table></table>"]) });
+    render(<DocumentViewer document={makeDocument({ filename: "расчёт.xlsx" })} load={original} loadPreview={loadPreview} />);
+    expect(await screen.findByTitle("Просмотр: расчёт.xlsx")).toHaveAttribute("sandbox", "");
+  });
+
+  it("FE-05: без маршрута предпросмотра и при ошибке конвертации оставляет доступ к оригиналу", async () => {
+    const { unmount } = render(
+      <DocumentViewer document={docx} load={original} loadPreview={() => Promise.reject(new ApiError(405, "нет"))} />,
+    );
+    expect(await screen.findByText(/Сервер пока не формирует версию этого формата/)).toBeInTheDocument();
+    expect(screen.getByText("Скачать оригинал")).toBeInTheDocument();
+    unmount();
+
+    render(
+      <DocumentViewer
+        document={docx}
+        load={original}
+        loadPreview={() => Promise.reject(new ApiError(422, "Файл повреждён", { detail: "Файл повреждён" }))}
+      />,
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Не удалось подготовить документ для просмотра: Файл повреждён");
+    expect(screen.getByText("Скачать оригинал")).toBeInTheDocument();
+  });
+
   it("показывает PDF во фрейме", async () => {
     render(<DocumentViewer document={makeDocument({ filename: "1.pdf" })} load={() => Promise.resolve(new Blob(["%PDF"]))} />);
     expect(await screen.findByTitle("Оригинал: 1.pdf")).toBeInTheDocument();
@@ -285,26 +330,39 @@ describe("PackageWorkspace", () => {
     await waitFor(() => expect(within(list).queryByText("1.pdf")).not.toBeInTheDocument());
   });
 
-  it("исправляет тип через перезагрузку файла, если backend не поддерживает PATCH", async () => {
-    const replacement = makeDocument({ id: "d3", type: "REGISTRATION_EXTRACT", filename: "1.pdf" });
+  it("FE-03: исправляет тип одним PATCH — документ сохраняет ID, автор и время видны", async () => {
+    const patched = makeDocument({
+      id: "d1",
+      type: "REGISTRATION_EXTRACT",
+      typeSource: "SPECIALIST",
+      typeChangedBy: "Анна Петрова",
+      typeChangedAt: "2026-10-10T09:00:00Z",
+      processingStatus: "DONE",
+    });
+    const api = mockApi({ ...baseRoutes, "PATCH /applications/app-1/documents/d1": patched });
+    renderWithProviders(<PackageWorkspace id="app-1" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Исправить тип" }));
+    await userEvent.selectOptions(await screen.findByLabelText("Новый тип документа"), "REGISTRATION_EXTRACT");
+    await userEvent.click(screen.getByRole("button", { name: "Сохранить тип" }));
+    expect(await screen.findByText("Тип документа сохранён")).toBeInTheDocument();
+    expect(await screen.findByText(/Тип указан специалистом Анна Петрова/)).toBeInTheDocument();
+    expect(JSON.parse(api.calls("PATCH /applications/app-1/documents/d1")[0][1]?.body as string)).toEqual({ type: "REGISTRATION_EXTRACT" });
+    expect(api.calls("POST /applications/app-1/documents")).toHaveLength(0);
+    expect(api.calls("DELETE /applications/app-1/documents/d1")).toHaveLength(0);
+  });
+
+  it("FE-03: при ошибке PATCH не перезагружает и не удаляет файл", async () => {
     const api = mockApi({
       ...baseRoutes,
       "PATCH /applications/app-1/documents/d1": () => new Response("", { status: 405 }),
-      "POST /applications/app-1/documents": (init: RequestInit | undefined) => {
-        const form = init?.body as FormData;
-        expect(form.get("type")).toBe("REGISTRATION_EXTRACT");
-        expect((form.get("file") as File).name).toBe("1.pdf");
-        return jsonResponse(replacement, 201);
-      },
-      "DELETE /applications/app-1/documents/d1": () => new Response(null, { status: 204 }),
     });
     renderWithProviders(<PackageWorkspace id="app-1" />);
     await userEvent.click(await screen.findByRole("button", { name: "Исправить тип" }));
     await userEvent.selectOptions(await screen.findByLabelText("Новый тип документа"), "REGISTRATION_EXTRACT");
     await userEvent.click(screen.getByRole("button", { name: "Сохранить тип" }));
-    expect(await screen.findByText("Тип документа исправлен")).toBeInTheDocument();
-    expect(api.calls("DELETE /applications/app-1/documents/d1")).toHaveLength(1);
-    expect(await screen.findByRole("heading", { level: 2, name: "Выписка из ЕГРЮЛ/ЕГРИП" })).toBeInTheDocument();
+    expect(await screen.findByText("Сервер пока не поддерживает исправление типа")).toBeInTheDocument();
+    expect(api.calls("POST /applications/app-1/documents")).toHaveLength(0);
+    expect(api.calls("DELETE /applications/app-1/documents/d1")).toHaveLength(0);
   });
 
   it("показывает пустой пакет и ошибку загрузки", async () => {

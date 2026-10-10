@@ -9,7 +9,10 @@ function parseInterval(raw: string | undefined): number {
 }
 
 export const config = {
-  /** Backend сам классифицирует документ по содержимому — тип при загрузке не передаётся. */
+  /**
+   * Backend классифицирует документ по содержимому — поле выбора типа при загрузке скрыто.
+   * Без флага тип можно указать вручную, но он не обязателен.
+   */
   autoClassify: process.env.NEXT_PUBLIC_AUTO_CLASSIFY === "true",
   /** Порог, ниже которого тип документа требует подтверждения специалиста (только отображение). */
   confidenceThreshold: parseThreshold(process.env.NEXT_PUBLIC_CONFIDENCE_THRESHOLD),

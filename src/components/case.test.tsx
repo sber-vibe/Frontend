@@ -112,10 +112,17 @@ describe("CreateCheckForm: программа субсидии", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ programCode: "INNOVATION" }));
   });
 
-  it("без перечня программ с сервера оставляет определение программы серверу", () => {
+  it("без перечня программ с сервера не обещает автоопределение и не создаёт заявку", () => {
     render(<CreateCheckForm programs={null} onSubmit={vi.fn()} onCreated={vi.fn()} />);
     expect(screen.queryByLabelText("Программа субсидии")).not.toBeInTheDocument();
-    expect(screen.getByText(/программу определит backend из заявления/)).toBeInTheDocument();
+    expect(screen.getByText(/Не удалось получить перечень программ/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Создать/ })).toBeDisabled();
+  });
+
+  it("без активных программ просит обратиться к администратору", () => {
+    render(<CreateCheckForm programs={[{ ...INNOVATION, active: false }]} onSubmit={vi.fn()} onCreated={vi.fn()} />);
+    expect(screen.getByText(/Нет активных программ/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Создать/ })).toBeDisabled();
   });
 });
 

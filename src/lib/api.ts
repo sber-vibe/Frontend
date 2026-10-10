@@ -14,6 +14,10 @@ import type {
 
 const BASE = "/api/v1";
 
+export type DocumentPreview =
+  | { state: "ready"; format: "pdf" | "html"; blob: Blob }
+  | { state: "pending"; retryAfterMs: number };
+
 const STATUS_MESSAGES: Record<number, string> = {
   400: "Некорректный запрос",
   401: "Требуется вход в систему",
@@ -72,10 +76,16 @@ export class ApiError extends Error {
 }
 
 let tokenProvider: () => string | null = () => null;
+let onUnauthorized: () => void = () => undefined;
 
 /** Подключение OIDC/JWT: AuthProvider передаёт сюда функцию получения access token. */
 export function setTokenProvider(provider: () => string | null) {
   tokenProvider = provider;
+}
+
+/** Что делать, если сервер ответил 401: AuthProvider завершает сессию и отправляет на вход. */
+export function setUnauthorizedHandler(handler: () => void) {
+  onUnauthorized = handler;
 }
 
 async function toApiError(response: Response): Promise<ApiError> {
@@ -106,7 +116,12 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
   } catch {
     throw new ApiError(0, "Нет связи с сервером. Проверьте, что backend запущен.");
   }
-  if (!response.ok) throw await toApiError(response);
+  if (!response.ok) {
+    const error = await toApiError(response);
+    // операция не выполнена: ошибка уходит вызывающему коду, а сессия восстанавливается через вход
+    if (response.status === 401) onUnauthorized();
+    throw error;
+  }
   return response;
 }
 
@@ -163,6 +178,23 @@ export const api = {
       { headers: { Accept: "*/*" } },
     );
     return response.blob();
+  },
+
+  /**
+   * Серверная версия документа для просмотра в браузере (PDF или HTML) — для DOC/DOCX/XLS/XLSX.
+   * 202 — версия ещё готовится; оригинал при этом остаётся доступен через downloadDocument.
+   */
+  documentPreview: async (applicationId: string, documentId: string): Promise<DocumentPreview> => {
+    const response = await request(`${doc(applicationId, documentId)}/preview`, {
+      headers: { Accept: "application/pdf, text/html, application/problem+json" },
+    });
+    if (response.status === 202) {
+      const retryAfter = Number(response.headers.get("Retry-After"));
+      return { state: "pending", retryAfterMs: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 3000 };
+    }
+    const contentType = (response.headers.get("Content-Type") ?? "").toLowerCase();
+    const blob = await response.blob();
+    return { state: "ready", format: contentType.includes("html") ? "html" : "pdf", blob };
   },
 
   deleteDocument: async (applicationId: string, documentId: string): Promise<void> => {

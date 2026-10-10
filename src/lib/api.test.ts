@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { api, ApiError, setTokenProvider } from "./api";
+import { api, ApiError, setTokenProvider, setUnauthorizedHandler } from "./api";
 import { jsonResponse, makeApplication } from "@/test/fixtures";
 
 function mockFetch(response: Response | Promise<Response>) {
@@ -7,6 +7,24 @@ function mockFetch(response: Response | Promise<Response>) {
 }
 
 describe("api client", () => {
+  it("FE-06: на 401 сообщает о завершении сессии и не выдаёт операцию за успешную", async () => {
+    const onUnauthorized = vi.fn();
+    setUnauthorizedHandler(onUnauthorized);
+    mockFetch(new Response("", { status: 401 }));
+    await expect(api.runCheck("app-1")).rejects.toMatchObject({ status: 401, message: "Требуется вход в систему" });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    setUnauthorizedHandler(() => undefined);
+  });
+
+  it("FE-05: предпросмотр — 202 означает «готовится», иначе PDF или HTML", async () => {
+    mockFetch(new Response(null, { status: 202, headers: { "Retry-After": "2" } }));
+    await expect(api.documentPreview("a", "d")).resolves.toEqual({ state: "pending", retryAfterMs: 2000 });
+    vi.restoreAllMocks();
+    const fetchSpy = mockFetch(new Response("<p>x</p>", { headers: { "Content-Type": "text/html; charset=utf-8" } }));
+    await expect(api.documentPreview("a", "d")).resolves.toMatchObject({ state: "ready", format: "html" });
+    expect(fetchSpy.mock.calls[0][0]).toBe("/api/v1/applications/a/documents/d/preview");
+  });
+
   it("загружает список проверок", async () => {
     const fetchSpy = mockFetch(jsonResponse([makeApplication()]));
     const list = await api.listApplications();

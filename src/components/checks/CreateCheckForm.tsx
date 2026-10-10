@@ -13,8 +13,10 @@ interface Props {
   onSubmit: (body: CreateApplication) => Promise<ApplicationView>;
   onCreated: (app: ApplicationView) => void;
   onCancel?: () => void;
-  /** Программы субсидий с сервера; null — сервер их пока не отдаёт, undefined — загружаются. */
+  /** Программы субсидий с сервера; null — перечень недоступен, undefined — загружаются. */
   programs?: Program[] | null;
+  /** Повторно запросить перечень программ. */
+  onRetryPrograms?: () => void;
 }
 
 /** Перечень документов выбранной программы — как его прислал сервер. */
@@ -50,7 +52,7 @@ function ProgramDocuments({ program }: { program: Program }) {
  * Создание заявки: специалист выбирает только программу (или оставляет автоопределение).
  * Организацию, ИНН, проект и сумму сервер извлечёт из загруженного пакета.
  */
-export function CreateCheckForm({ onSubmit, onCreated, onCancel, programs }: Props) {
+export function CreateCheckForm({ onSubmit, onCreated, onCancel, programs, onRetryPrograms }: Props) {
   const [programCode, setProgramCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -70,6 +72,8 @@ export function CreateCheckForm({ onSubmit, onCreated, onCancel, programs }: Pro
 
   const activePrograms = (programs ?? []).filter((p) => p.active !== false);
   const selectedProgram = activePrograms.find((p) => p.code === programCode);
+  // Без перечня программ с сервера заявку не создаём: не обещаем анализ, которого сервер может не поддерживать.
+  const unavailable = programs === null || (Array.isArray(programs) && activePrograms.length === 0);
 
   return (
     <form className={s.form} onSubmit={submit} noValidate aria-label="Новая заявка">
@@ -88,10 +92,20 @@ export function CreateCheckForm({ onSubmit, onCreated, onCancel, programs }: Pro
         )}
       </AnimatePresence>
 
-      {programs === null ? (
-        <p className={s.note}>
-          <Icon name="info" size={16} /> Сервер пока не отдаёт перечень программ — программу определит backend из заявления.
-        </p>
+      {unavailable ? (
+        <div className={s.serverError} role="alert">
+          <Icon name="alert" size={18} />
+          <span>
+            {programs === null
+              ? "Не удалось получить перечень программ субсидий. Создать заявку сейчас нельзя: без программы сервер не проверит комплектность."
+              : "Нет активных программ субсидий. Обратитесь к администратору."}
+          </span>
+          {programs === null && onRetryPrograms && (
+            <Button size="sm" variant="outline" icon="refresh" onClick={onRetryPrograms}>
+              Повторить
+            </Button>
+          )}
+        </div>
       ) : (
         <SelectField
           label="Программа субсидии"
@@ -124,7 +138,7 @@ export function CreateCheckForm({ onSubmit, onCreated, onCancel, programs }: Pro
             Отмена
           </Button>
         )}
-        <Button type="submit" size="lg" loading={submitting} iconRight="arrowRight">
+        <Button type="submit" size="lg" loading={submitting} disabled={unavailable || programs === undefined} iconRight="arrowRight">
           Создать и загрузить пакет
         </Button>
       </div>

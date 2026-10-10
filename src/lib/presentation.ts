@@ -116,15 +116,35 @@ const REPORT_STATUS: Record<string, StatusView> = {
   REJECTED: { label: "Есть ошибки", tone: "danger", description: "Пакет не прошёл проверку." },
 };
 
-export function reportStatusView(report: CheckReport | null, documentsCount = 0): StatusView {
+/** Отчёт пройден, но не по всем файлам есть результат: зелёным такой итог не показываем. */
+export const INCOMPLETE_RESULT: StatusView = {
+  label: "Результат неполный",
+  tone: "warning",
+  description:
+    "Не по всем файлам есть результат обработки: файл не обработан, обработка не удалась или тип не определён. Проверьте эти файлы.",
+};
+
+/** Файлы, по которым нет явного результата: не обработаны, ошибка или тип не определён. */
+export function unresolvedDocuments(documents: DocumentView[]): DocumentView[] {
+  return documents.filter((d) => !isProcessed(d) || (!effectiveType(d) && d.typeSource !== "SPECIALIST"));
+}
+
+/**
+ * Итог пакета. Передайте documents, чтобы «пройдено» не показывалось, если по части файлов нет результата.
+ * Неизвестный статус сервера — нейтральный, а не успех.
+ */
+export function reportStatusView(report: CheckReport | null, documents: number | DocumentView[] = 0): StatusView {
+  const count = typeof documents === "number" ? documents : documents.length;
   if (!report) {
-    return documentsCount === 0
+    return count === 0
       ? { label: "Ожидает документы", tone: "neutral", description: "Загрузите пакет документов организации." }
       : { label: "Не проверено", tone: "neutral", description: "Документы загружены, запустите проверку." };
   }
-  return (
-    REPORT_STATUS[report.status] ?? { label: report.status, tone: "neutral", description: "Статус получен от сервера." }
-  );
+  const view = REPORT_STATUS[report.status] ?? { label: report.status, tone: "neutral", description: "Статус получен от сервера." };
+  if (view.tone === "success" && typeof documents !== "number" && unresolvedDocuments(documents).length > 0) {
+    return INCOMPLETE_RESULT;
+  }
+  return view;
 }
 
 /* ---------- Решение специалиста ---------- */
@@ -162,22 +182,34 @@ const STAGE_LABEL: Record<ProcessingStatus, string> = {
   FAILED: "Обработка не удалась",
 };
 
-/** Документ без processingStatus — backend без фоновой обработки, файл уже обработан при загрузке. */
-export function processingStatus(doc: DocumentView): ProcessingStatus {
-  return doc.processingStatus ?? "DONE";
+/**
+ * Статус обработки файла от сервера. null — сервер его не сообщил: это «нет результата обработки»,
+ * а не «проверен». Успех показывается только по явному ответу сервера.
+ */
+export function processingStatus(doc: DocumentView): ProcessingStatus | null {
+  return doc.processingStatus ?? null;
 }
 
 export function isProcessing(doc: DocumentView): boolean {
   const s = processingStatus(doc);
-  return s !== "DONE" && s !== "FAILED";
+  return s !== null && s !== "DONE" && s !== "FAILED";
+}
+
+/** Файл обработан и сервер явно сообщил DONE. */
+export function isProcessed(doc: DocumentView): boolean {
+  return processingStatus(doc) === "DONE";
 }
 
 export function processingStage(doc: DocumentView): number {
-  return STAGE[processingStatus(doc)] ?? 0;
+  const s = processingStatus(doc);
+  return s ? (STAGE[s] ?? 0) : 0;
 }
 
+export const NO_PROCESSING_RESULT = "Нет результата обработки";
+
 export function processingLabel(doc: DocumentView): string {
-  return STAGE_LABEL[processingStatus(doc)] ?? processingStatus(doc);
+  const s = processingStatus(doc);
+  return s ? (STAGE_LABEL[s] ?? s) : NO_PROCESSING_RESULT;
 }
 
 /** Нужно ли опрашивать сервер: есть файлы в обработке или отчёт ещё формируется. */
@@ -199,7 +231,7 @@ export const DASHBOARD_FILTERS: { id: DashboardFilter; label: string }[] = [
 ];
 
 export function matchesFilter(app: ApplicationView, filter: DashboardFilter): boolean {
-  const tone = app.report ? reportStatusView(app.report).tone : null;
+  const tone = app.report ? reportStatusView(app.report, app.documents).tone : null;
   switch (filter) {
     case "all":
       return true;
@@ -255,17 +287,19 @@ export function documentFindings(doc: DocumentView, report: CheckReport | null):
   );
 }
 
-/** Отметка документа в списке пакета: итог сервера по файлу, иначе — по замечаниям, привязанным к документу. */
+/**
+ * Отметка документа в списке пакета. Зелёная — только при явном outcome = PASSED от сервера:
+ * отсутствие замечаний, статуса или полей не означает, что файл проверен.
+ */
 export function documentTone(doc: DocumentView, report: CheckReport | null): Tone {
   if (isProcessing(doc)) return "info";
   if (processingStatus(doc) === "FAILED") return "danger";
   if (doc.outcome) return OUTCOME_TONE[doc.outcome];
   if (needsConfirmation(doc)) return "warning";
-  if (!report) return "neutral";
   const related = documentFindings(doc, report);
   if (related.some((f) => findingSeverity(f) === "ERROR")) return "danger";
   if (related.some((f) => findingSeverity(f) === "WARNING")) return "warning";
-  return "success";
+  return "neutral";
 }
 
 export function documentOutcomeLabel(doc: DocumentView, report: CheckReport | null): string {
@@ -274,8 +308,10 @@ export function documentOutcomeLabel(doc: DocumentView, report: CheckReport | nu
   if (doc.outcome) return OUTCOME_VIEW[doc.outcome].label;
   if (needsConfirmation(doc)) return "Требует проверки типа";
   const tone = documentTone(doc, report);
-  if (!report) return "Ждёт проверки пакета";
-  return tone === "danger" ? "Есть ошибки" : tone === "warning" ? "Требует внимания" : "Пройдено";
+  if (tone === "danger") return "Есть ошибки";
+  if (tone === "warning") return "Требует внимания";
+  if (!processingStatus(doc)) return NO_PROCESSING_RESULT;
+  return report ? "Нет итога по файлу" : "Ждёт проверки пакета";
 }
 
 /* ---------- Комплектность ---------- */

@@ -2,10 +2,9 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { config } from "@/lib/config";
 import { typeTitle } from "@/lib/documentTypes";
 import { formatDateTime, pluralize } from "@/lib/format";
 import {
@@ -20,8 +19,10 @@ import {
 import { buildProtocol, downloadText } from "@/lib/protocol";
 import { applicationTitle, recognizedInn, requisiteText } from "@/lib/requisites";
 import { errorMessage, useAsync } from "@/lib/useAsync";
+import { usePolling } from "@/lib/usePolling";
 import type { ApplicationView, Finding } from "@/lib/types";
 import { BackLink } from "@/components/BackLink";
+import { PollingNotice } from "@/components/PollingNotice";
 import { Button, ButtonLink, EmptyState, ErrorState, Icon, ProgressRing, Skeleton, Spinner, type IconName } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { DecisionPanel } from "./DecisionPanel";
@@ -144,17 +145,11 @@ export function ReportView({ id }: { id: string }) {
   const [rechecking, setRechecking] = useState(false);
 
   const app = data?.[0];
-  const polling = app ? needsPolling(app) : false;
-  useEffect(() => {
-    if (!polling) return;
-    const timer = setInterval(() => {
-      api.getApplication(id).then(
-        (fresh) => mutate(([, t]) => [fresh, t]),
-        () => undefined,
-      );
-    }, config.pollInterval);
-    return () => clearInterval(timer);
-  }, [polling, id, mutate]);
+  const polling = usePolling(
+    app ? needsPolling(app) : false,
+    () => api.getApplication(id),
+    (fresh) => mutate(([, t]) => [fresh, t]),
+  );
 
   if (error) return <ErrorState message={error} onRetry={reload} />;
   if (loading && !data) {
@@ -186,6 +181,7 @@ export function ReportView({ id }: { id: string }) {
     return (
       <div className={s.page}>
         <BackLink href={`/checks/${id}`}>К пакету документов</BackLink>
+        <PollingNotice polling={polling} />
         {processingCount > 0 ? (
           <EmptyState
             icon="clock"
@@ -210,7 +206,7 @@ export function ReportView({ id }: { id: string }) {
   }
 
   const report = app.report;
-  const status = reportStatusView(report, app.documents.length);
+  const status = reportStatusView(report, app.documents);
   const groups = groupFindings(report.findings);
   const completeness = completenessRows(requiredTypes, report);
   const missingTitles = completeness.missing.map((t) => typeTitle(t));
@@ -254,6 +250,8 @@ export function ReportView({ id }: { id: string }) {
           </div>
         </div>
       </motion.section>
+
+      <PollingNotice polling={polling} />
 
       {processingCount > 0 && (
         <div className={`${s.processing} no-print`} role="status" aria-live="polite">

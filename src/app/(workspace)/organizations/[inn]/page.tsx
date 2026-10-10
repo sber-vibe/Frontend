@@ -44,7 +44,7 @@ export default function OrganizationPage() {
       ) : (
         <ol style={{ display: "grid", gap: 14, margin: 0, padding: 0, listStyle: "none" }}>
           {apps.map((app, i) => {
-            const status = reportStatusView(app.report, app.documents.length);
+            const status = reportStatusView(app.report, app.documents);
             const groups = app.report ? groupFindings(app.report.findings) : null;
             const decision = app.decision ? DECISION_VIEW[app.decision.decision] : null;
             const issues = groups ? [...groups.errors, ...groups.warnings] : [];

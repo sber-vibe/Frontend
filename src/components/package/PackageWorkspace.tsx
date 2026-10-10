@@ -4,14 +4,15 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import { config } from "@/lib/config";
 import { selectableTypes } from "@/lib/documentTypes";
 import { pluralize } from "@/lib/format";
 import { DECISION_VIEW, documentFindings, isProcessing, needsPolling, reportStatusView } from "@/lib/presentation";
 import { applicationTitle, NOT_RECOGNIZED, recognizedInn, requisiteView, type RequisiteView } from "@/lib/requisites";
 import { errorMessage, useAsync } from "@/lib/useAsync";
+import { usePolling } from "@/lib/usePolling";
 import type { ApplicationView, DocumentTypeCode, DocumentView } from "@/lib/types";
 import { BackLink } from "@/components/BackLink";
+import { PollingNotice } from "@/components/PollingNotice";
 import Link from "next/link";
 import { Badge, Button, ButtonLink, EmptyState, ErrorState, Icon, Skeleton, Spinner } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui/Dialog";
@@ -55,17 +56,11 @@ export function PackageWorkspace({ id }: { id: string }) {
   );
 
   // Фоновая обработка: пока сервер разбирает файлы, опрашиваем заявку и показываем результат по мере готовности.
-  const polling = app ? needsPolling(app) : false;
-  useEffect(() => {
-    if (!polling) return;
-    const timer = setInterval(() => {
-      api.getApplication(id).then(
-        (fresh) => setApp(() => fresh),
-        () => undefined, // временная ошибка сети — попробуем на следующем тике
-      );
-    }, config.pollInterval);
-    return () => clearInterval(timer);
-  }, [polling, id, setApp]);
+  const polling = usePolling(
+    app ? needsPolling(app) : false,
+    () => api.getApplication(id),
+    (fresh) => setApp(() => fresh),
+  );
 
   // если выбранного документа нет (удалён или ещё не выбран) — выбираем первый
   useEffect(() => {
@@ -88,12 +83,14 @@ export function PackageWorkspace({ id }: { id: string }) {
     [id],
   );
 
+  const loadPreview = useCallback((doc: DocumentView) => api.documentPreview(id, doc.id), [id]);
+
   if (error) return <ErrorState message={error} onRetry={reload} />;
   if (loading && !app) return <PackageSkeleton />;
   if (!app) return null;
 
   const selected = app.documents.find((d) => d.id === selectedId) ?? null;
-  const status = reportStatusView(app.report, app.documents.length);
+  const status = reportStatusView(app.report, app.documents);
   const docFindings = selected ? documentFindings(selected, app.report) : [];
   const processingCount = app.documents.filter(isProcessing).length;
   const decision = app.decision ? DECISION_VIEW[app.decision.decision] : null;
@@ -108,29 +105,17 @@ export function PackageWorkspace({ id }: { id: string }) {
   const replaceDocument = (oldId: string, next: DocumentView) =>
     setApp((a) => ({ ...a, report: null, documents: a.documents.map((d) => (d.id === oldId ? next : d)) }));
 
+  // Только атомарный PATCH: документ сохраняет ID и оригинал, автор и время правки фиксирует сервер.
+  // При ошибке ничего не перезагружаем и не удаляем.
   const changeType = async (doc: DocumentView, type: DocumentTypeCode) => {
     try {
       const updated = await api.updateDocument(id, doc.id, { type });
       replaceDocument(doc.id, updated);
-      toast.success("Тип документа сохранён");
+      toast.success("Тип документа сохранён", "Запустите проверку повторно");
     } catch (e) {
-      if (!(e instanceof ApiError && e.isUnsupported)) {
-        toast.error("Не удалось изменить тип", errorMessage(e));
-        throw e;
-      }
-      // Backend без PATCH: перезагружаем тот же файл с исправленным типом и удаляем старую запись.
-      try {
-        const blob = await loadBlob(doc);
-        const uploaded = await api.uploadDocument(id, new File([blob], doc.filename), type);
-        await api.deleteDocument(id, doc.id);
-        blobs.current.set(uploaded.id, Promise.resolve(blob));
-        replaceDocument(doc.id, uploaded);
-        setSelectedId(uploaded.id);
-        toast.success("Тип документа исправлен", "Запустите проверку повторно");
-      } catch (err) {
-        toast.error("Не удалось изменить тип", errorMessage(err));
-        throw err;
-      }
+      const msg = e instanceof ApiError && e.isUnsupported ? "Сервер пока не поддерживает исправление типа" : errorMessage(e);
+      toast.error("Не удалось изменить тип", msg);
+      throw e;
     }
   };
 
@@ -254,6 +239,8 @@ export function PackageWorkspace({ id }: { id: string }) {
         </div>
       </motion.header>
 
+      <PollingNotice polling={polling} />
+
       {app.duplicateOf && (
         <div className={s.banner} data-tone="warning" role="status">
           <Icon name="alert" size={18} />
@@ -346,7 +333,7 @@ export function PackageWorkspace({ id }: { id: string }) {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.25 }}
               >
-                <DocumentViewer document={selected} load={loadBlob} />
+                <DocumentViewer document={selected} load={loadBlob} loadPreview={loadPreview} />
                 <DocumentDetails
                   document={selected}
                   types={types}
