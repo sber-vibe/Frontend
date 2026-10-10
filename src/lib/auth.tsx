@@ -1,9 +1,9 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { setTokenProvider, setUnauthorizedHandler } from "./api";
-import { buildAuthorizeUrl, decodeJwt, getOidcConfig, logoutUrl, type TokenSet } from "./oidc";
+import { buildAuthorizeUrl, decodeJwt, getOidcConfig, logoutUrl, refreshTokens, type OidcConfig, type TokenSet } from "./oidc";
 
 export type Role = "specialist" | "admin";
 
@@ -15,6 +15,15 @@ export interface Session {
   accessToken?: string;
   idToken?: string;
   expiresAt?: number;
+  refreshToken?: string;
+  refreshExpiresAt?: number;
+}
+
+/** За сколько до истечения access token продлеваем его. */
+const REFRESH_AHEAD_MS = 60 * 1000;
+
+function canRefresh(session: Session, now = Date.now()): boolean {
+  return Boolean(session.refreshToken) && (!session.refreshExpiresAt || session.refreshExpiresAt > now);
 }
 
 /** Роли из access token Keycloak. Только для показа интерфейса — доступ проверяет backend. */
@@ -68,7 +77,8 @@ function readSession(): Session | null {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const session = JSON.parse(raw) as Session;
-    if (session.expiresAt && session.expiresAt < Date.now()) return null;
+    // access token истёк, но сессию ещё можно продлить — восстановим её при загрузке
+    if (session.expiresAt && session.expiresAt < Date.now() && !canRefresh(session)) return null;
     return session;
   } catch {
     return null;
@@ -84,42 +94,77 @@ function writeSession(session: Session | null) {
   }
 }
 
+async function renew(oidc: OidcConfig | null, session: Session): Promise<Session | null> {
+  if (!oidc || !session.refreshToken || !canRefresh(session)) return null;
+  try {
+    const tokens = await refreshTokens(oidc, session.refreshToken);
+    return { ...session, ...tokens, roles: rolesFromClaims(decodeJwt(tokens.accessToken)) };
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
   const oidc = useMemo(() => getOidcConfig(), []);
-
-  useEffect(() => {
-    setSession(readSession());
-    setReady(true);
-  }, []);
-
-  useEffect(() => {
-    setTokenProvider(() => session?.accessToken ?? null);
-  }, [session]);
+  // Текущая сессия для api-клиента. Обновляется синхронно, до рендера страниц: иначе первые запросы
+  // после перезагрузки уходят без токена, получают 401 и сбрасывают сессию.
+  const current = useRef<Session | null>(null);
 
   const update = useCallback((next: Session | null) => {
+    current.current = next;
     writeSession(next);
     setSession(next);
   }, []);
 
-  // Токен Keycloak истёк или отозван: завершаем сессию — рабочие страницы отправят на вход с возвратом назад.
+  // Сессия Keycloak завершена или токен отозван — рабочие страницы отправят на вход с возвратом назад.
   const expire = useCallback(() => {
     markSessionExpired();
     update(null);
   }, [update]);
 
   useEffect(() => {
-    setUnauthorizedHandler(() => {
-      if (session?.mode === "oidc") expire();
+    setTokenProvider(() => current.current?.accessToken ?? null);
+    setUnauthorizedHandler((token) => {
+      // 401 на устаревший токен (его уже сменили продлением) сессию не завершает
+      const now = current.current;
+      if (now?.mode === "oidc" && (!token || token === now.accessToken)) expire();
     });
-  }, [session, expire]);
+  }, [expire]);
 
   useEffect(() => {
+    let cancelled = false;
+    const restore = async () => {
+      let next = readSession();
+      if (next?.mode === "oidc" && next.expiresAt && next.expiresAt - Date.now() < REFRESH_AHEAD_MS) {
+        next = await renew(oidc, next);
+        if (!next) markSessionExpired();
+      }
+      if (cancelled) return;
+      update(next);
+      setReady(true);
+    };
+    void restore();
+    return () => {
+      cancelled = true;
+    };
+  }, [oidc, update]);
+
+  // Продлеваем access token заранее; не удалось — сессия Keycloak завершена, отправляем на вход.
+  useEffect(() => {
     if (session?.mode !== "oidc" || !session.expiresAt) return;
-    const timer = setTimeout(expire, Math.max(0, session.expiresAt - Date.now()));
+    const timer = setTimeout(
+      async () => {
+        const next = await renew(oidc, session);
+        if (current.current !== session) return; // за это время вышли или вошли заново
+        if (next) update(next);
+        else expire();
+      },
+      Math.max(0, session.expiresAt - Date.now() - REFRESH_AHEAD_MS),
+    );
     return () => clearTimeout(timer);
-  }, [session, expire]);
+  }, [session, oidc, update, expire]);
 
   const api = useMemo<AuthApi>(
     () => ({

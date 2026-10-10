@@ -108,6 +108,39 @@ export interface TokenSet {
   accessToken: string;
   idToken?: string;
   expiresAt: number;
+  /** Refresh token Keycloak: продлевает сессию без повторного входа (в том числе после обновления страницы). */
+  refreshToken?: string;
+  refreshExpiresAt?: number;
+}
+
+interface TokenResponse {
+  access_token: string;
+  id_token?: string;
+  expires_in: number;
+  refresh_token?: string;
+  refresh_expires_in?: number;
+}
+
+function toTokenSet(body: TokenResponse, now = Date.now()): TokenSet {
+  return {
+    accessToken: body.access_token,
+    idToken: body.id_token,
+    expiresAt: now + body.expires_in * 1000,
+    refreshToken: body.refresh_token,
+    // 0 — без ограничения (offline-токен)
+    refreshExpiresAt: body.refresh_token && body.refresh_expires_in ? now + body.refresh_expires_in * 1000 : undefined,
+  };
+}
+
+/** Обновить токены по refresh token. Ошибка — сессия Keycloak завершена, нужен вход. */
+export async function refreshTokens(cfg: OidcConfig, refreshToken: string): Promise<TokenSet> {
+  const response = await fetch(`${cfg.issuer}/protocol/openid-connect/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "refresh_token", client_id: cfg.clientId, refresh_token: refreshToken }),
+  });
+  if (!response.ok) throw new Error("Сессия завершена");
+  return toTokenSet((await response.json()) as TokenResponse);
 }
 
 export async function exchangeCode(cfg: OidcConfig, code: string, state: string): Promise<{ tokens: TokenSet; returnTo: string }> {
@@ -128,9 +161,8 @@ export async function exchangeCode(cfg: OidcConfig, code: string, state: string)
     }),
   });
   if (!response.ok) throw new Error("Сервер авторизации отклонил вход");
-  const body = (await response.json()) as { access_token: string; id_token?: string; expires_in: number };
   return {
-    tokens: { accessToken: body.access_token, idToken: body.id_token, expiresAt: Date.now() + body.expires_in * 1000 },
+    tokens: toTokenSet((await response.json()) as TokenResponse),
     returnTo: returnTo.startsWith("/") ? returnTo : "/checks",
   };
 }

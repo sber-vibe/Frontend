@@ -76,7 +76,7 @@ export class ApiError extends Error {
 }
 
 let tokenProvider: () => string | null = () => null;
-let onUnauthorized: () => void = () => undefined;
+let onUnauthorized: (token: string | null) => void = () => undefined;
 
 /** Подключение OIDC/JWT: AuthProvider передаёт сюда функцию получения access token. */
 export function setTokenProvider(provider: () => string | null) {
@@ -84,7 +84,7 @@ export function setTokenProvider(provider: () => string | null) {
 }
 
 /** Что делать, если сервер ответил 401: AuthProvider завершает сессию и отправляет на вход. */
-export function setUnauthorizedHandler(handler: () => void) {
+export function setUnauthorizedHandler(handler: (token: string | null) => void) {
   onUnauthorized = handler;
 }
 
@@ -119,7 +119,7 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
   if (!response.ok) {
     const error = await toApiError(response);
     // операция не выполнена: ошибка уходит вызывающему коду, а сессия восстанавливается через вход
-    if (response.status === 401) onUnauthorized();
+    if (response.status === 401) onUnauthorized(token);
     throw error;
   }
   return response;
