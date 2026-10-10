@@ -66,6 +66,7 @@ Next.js проксирует `/api/*` на `BACKEND_URL` (rewrites), поэто�
 | `NEXT_PUBLIC_CONFIDENCE_THRESHOLD` | `0.8` | Ниже этого порога тип помечается как требующий подтверждения |
 | `NEXT_PUBLIC_POLL_INTERVAL_MS` | `2000` | Период опроса сервера, пока документы обрабатываются в фоне |
 | `NEXT_PUBLIC_OIDC_ISSUER`, `NEXT_PUBLIC_OIDC_CLIENT_ID` | пусто | Keycloak realm и public client. Redirect URI: `<origin>/auth/callback` |
+| `NEXT_PUBLIC_MAX_FILE_MB` | `100` | Лимит на один файл, МБ; должен совпадать с backend и nginx |
 | `NEXT_PUBLIC_DEMO_LOGIN` | `false` | Только для разработки и e2e без Keycloak: вход по имени с выбором роли. Роль не даёт прав на сервере. В сдаваемой сборке — `false` |
 
 ## Контракт API

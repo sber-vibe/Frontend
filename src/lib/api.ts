@@ -14,6 +14,7 @@ import type {
   Program,
   Rule,
 } from "./types";
+import { config } from "./config";
 
 /** Сколько записей общего журнала загружать за раз. */
 export const JOURNAL_PAGE = 50;
@@ -44,13 +45,13 @@ const DETAIL_TRANSLATIONS: Record<string, string> = {
   "Document not found": "Документ не найден",
   "File must not be empty": "Файл пустой",
   "Invalid filename": "Недопустимое имя файла",
-  "Demo storage limit exceeded": "Превышен лимит хранилища (50 МБ на файл, 50 МБ всего)",
+  "Demo storage limit exceeded": "Превышен лимит размера документов заявки",
   "Demo document limit reached": "Достигнут лимит документов в проверке",
   "Demo application limit reached": "Достигнут лимит проверок",
   "Allowed extensions: pdf, docx, txt, png, jpg, jpeg": "Допустимые форматы: PDF, DOCX, TXT, PNG, JPG",
   "Unable to read uploaded file": "Не удалось прочитать загруженный файл",
   "Invalid request content.": "Проверьте правильность заполнения полей",
-  "Maximum upload size exceeded": "Файл больше 50 МБ",
+  "Maximum upload size exceeded": `Файл больше ${config.maxFileMb} МБ`,
   "Program not found": "Программа субсидии не найдена",
   "Rule not found": "Правило не найдено",
   "Model unavailable": "Модель недоступна, попробуйте повторить позже",

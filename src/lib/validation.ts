@@ -18,6 +18,6 @@ export function validateFile(file: File): string | null {
     return `Формат не поддерживается. Допустимы ${config.acceptedFormatsLabel}`;
   }
   if (file.size === 0) return "Файл пустой";
-  if (file.size > config.maxFileSize) return "Файл больше 50 МБ";
+  if (file.size > config.maxFileSize) return `Файл больше ${config.maxFileMb} МБ`;
   return null;
 }

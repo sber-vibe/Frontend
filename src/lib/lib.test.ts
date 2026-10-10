@@ -71,11 +71,11 @@ describe("validation", () => {
     expect(validateFile(new File(["x"], "a.exe"))).toMatch(/Формат/);
     expect(validateFile(new File([], "a.pdf"))).toBe("Файл пустой");
     const big = new File(["x"], "big.png");
-    Object.defineProperty(big, "size", { value: 50 * 1024 * 1024 });
+    Object.defineProperty(big, "size", { value: 100 * 1024 * 1024 });
     expect(validateFile(big)).toBeNull();
     const oversized = new File(["x"], "oversized.png");
-    Object.defineProperty(oversized, "size", { value: 50 * 1024 * 1024 + 1 });
-    expect(validateFile(oversized)).toMatch(/50 МБ/);
+    Object.defineProperty(oversized, "size", { value: 100 * 1024 * 1024 + 1 });
+    expect(validateFile(oversized)).toMatch(/100 МБ/);
   });
 });
 
